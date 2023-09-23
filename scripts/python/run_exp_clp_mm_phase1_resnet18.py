@@ -35,7 +35,7 @@ def objective(exp, epochs, lr, wd):
         'criterion': 'cls',
         'dataset': 'dual_cifar10',
         'optim': 'sgd',
-        'scheduler': None
+        'scheduler': 'multiplicative'
     }
     
     
@@ -187,7 +187,7 @@ def objective(exp, epochs, lr, wd):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = 'reports'
+    config.base_path = '/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
@@ -213,5 +213,5 @@ if __name__ == "__main__":
     lr = float(sys.argv[1])
     wd = float(sys.argv[2])
     print(lr, wd)
-    EPOCHS = 280
+    EPOCHS = 200
     objective('deficit_reverse', EPOCHS, lr, wd)

@@ -10,7 +10,7 @@ from src.utils.utils_optim import get_every_but_forbidden_parameter_names, FORBI
 from torch.func import functional_call, vmap, grad
 
 
-class TraceFIMOverheadPrevention(torch.nn.Module):
+class TraceFIM(torch.nn.Module): #OverheadPrevention
     def __init__(self, held_out, model, num_classes):
         super().__init__()
         self.device = next(model.parameters()).device
@@ -63,9 +63,9 @@ class TraceFIMOverheadPrevention(torch.nn.Module):
         ft_per_sample_grads1 = {k1: v.detach().data for k1, v in ft_per_sample_grads1.items()}
         ft_per_sample_grads2 = self.ft_criterion(params2, buffers, config, (x_true1, x_true2))
         ft_per_sample_grads2 = {k1: v.detach().data for k1, v in ft_per_sample_grads2.items()}
-        # ft_per_sample_grads3 = {}
-        ft_per_sample_grads3 = self.ft_criterion(params3, buffers, config, (x_true1, x_true2))
-        ft_per_sample_grads3 = {k1: v.detach().data for k1, v in ft_per_sample_grads3.items()}
+        ft_per_sample_grads3 = {}
+        # ft_per_sample_grads3 = self.ft_criterion(params3, buffers, config, (x_true1, x_true2))
+        # ft_per_sample_grads3 = {k1: v.detach().data for k1, v in ft_per_sample_grads3.items()}
         ft_per_sample_grads = ft_per_sample_grads1 | ft_per_sample_grads2 | ft_per_sample_grads3
         params_names1 = [n for n, _ in params1.items()]
         params_names2 = [n for n, _ in params2.items()]
@@ -92,14 +92,14 @@ class TraceFIMOverheadPrevention(torch.nn.Module):
         evaluators[f'trace_fim_{kind}/overall_trace2'] = overall_trace2
         evaluators[f'trace_fim_{kind}/overall_trace3'] = overall_trace3
         evaluators[f'trace_fim_{kind}/overall_ratio_1_to_2'] = overall_trace1 / (overall_trace2 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
+        # evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
+        # evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
         evaluators['steps/trace_fim'] = step
         self.model.train()
         self.logger.log_scalars(evaluators, step)    
         
         
-class TraceFIM(torch.nn.Module):
+class TraceFIM__(torch.nn.Module):
     def __init__(self, held_out, model, num_classes):
         super().__init__()
         self.device = next(model.parameters()).device

@@ -34,7 +34,7 @@ def objective(exp, epochs, lr, wd, phase3):
         'criterion': 'cls',
         'dataset': 'dual_cifar10',
         'optim': 'sgd',
-        'scheduler': None
+        'scheduler': 'multiplicative'
     }
     
     
@@ -86,17 +86,17 @@ def objective(exp, epochs, lr, wd, phase3):
     LR = lr
     MOMENTUM = 0.0
     WD = wd
+    LR_LAMBDA = 0.98
     T_max = (len(loaders['train']) // GRAD_ACCUM_STEPS) * epochs
-    # print(T_max//window, T_max-3*T_max//window, 3*T_max//window)
-    # h_params_overall['scheduler'] = {'eta_max':LR, 'eta_medium':1e-2, 'eta_min':1e-6, 'warmup_iters2': 3*T_max//window, 'inter_warmups_iters': T_max-3*T_max//window, 'warmup_iters1': 3*T_max//window, 'milestones':[], 'gamma':1e-1}
-    optim_params = {'lr': LR, 'momentum': MOMENTUM, 'weight_decay': WD}
-    scheduler_params = None
+    optim_params = {'lr': LR, 'weight_decay': WD}
+    scheduler_params = {'lr_lambda': lambda epoch: LR_LAMBDA}
     
     optim, lr_scheduler = prepare_optim_and_scheduler(model, optim_name=type_names['optim'], optim_params=optim_params, scheduler_name=type_names['scheduler'], scheduler_params=scheduler_params)
+    scheduler_params['lr_lambda'] = LR_LAMBDA # problem with omegacong with primitive type
     
     # ════════════════════════ prepare wandb params ════════════════════════ #
     
-    checkpoint_path = f'/raid/NFS_SHARE/home/b.krzepkowski/Github/CLPInterventions/reports/just_run, sgd, dual_cifar10, mm_resnet_fp_0.0_lr_0.6_wd_0.0 overlap=0.0, phase3, intervention deactivation, trained with phase1=80 and phase2=0 /2023-09-10_17-28-20/checkpoints/model_step_epoch_{phase3}.pth'
+    checkpoint_path = f'/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports/just_run, sgd, dual_cifar10, mm_resnet_fp_0.0_lr_0.5_wd_0.0001 overlap=0.0, phase3, intervention deactivation, trained with phase1=80 and phase2=0 /2023-09-22_15-02-01/checkpoints/model_step_epoch_{phase3}.pth'
     phase1 = 80
     phase2 = 0
     quick_name = f'trained with phase1={phase1} and phase2={phase2} and phase3={phase3}'
@@ -190,7 +190,7 @@ def objective(exp, epochs, lr, wd, phase3):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = 'reports'
+    config.base_path = '/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
@@ -217,5 +217,5 @@ if __name__ == "__main__":
     wd = float(sys.argv[2])
     phase3 = int(sys.argv[3])
     print(lr, wd)
-    EPOCHS = 250
+    EPOCHS = 320
     objective('just_run', EPOCHS, lr, wd, phase3)
