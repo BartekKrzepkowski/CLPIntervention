@@ -19,6 +19,8 @@ from src.trainer.trainer_classification_dual_clp import TrainerClassification
 from src.modules.aux_modules import TraceFIM
 from src.modules.metrics import RunStatsBiModal
 
+# TODO: 1) Napisz mm_simplecnn, 2) Napisz Dual_fminst
+
 
 def objective(exp, epochs, lr, wd):
     # ════════════════════════ prepare general params ════════════════════════ #
@@ -31,9 +33,9 @@ def objective(exp, epochs, lr, wd):
     OVERLAP = 0.0
     
     type_names = {
-        'model': 'mm_resnet',
+        'model': 'mm_simplecnn',
         'criterion': 'cls',
-        'dataset': 'dual_cifar10',
+        'dataset': 'dual_fmnist',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -48,14 +50,7 @@ def objective(exp, epochs, lr, wd):
     # ════════════════════════ prepare model ════════════════════════ #
     
     
-    model_config = {'backbone_type': 'resnet18',
-                    'only_features': False,
-                    'batchnorm_layers': True,
-                    'width_scale': 1.0,
-                    'skips': True,
-                    'modify_resnet': True,
-                    'wheter_concate': False,
-                    'overlap': OVERLAP,}
+    
     model_params = {'model_config': model_config, 'num_classes': NUM_CLASSES, 'dataset_name': type_names['dataset']}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
