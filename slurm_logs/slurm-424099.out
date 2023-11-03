@@ -1,0 +1,26 @@
+/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/site-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.25.2
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+Traceback (most recent call last):
+  File "/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/net/people/plgrid/plgkrzepk/Github/CLPIntervention2/scripts/python/run_exp_clp_mm_phase1_resnet18.py", line 217, in <module>
+    objective('deficit_reverse', EPOCHS, lr, wd)
+  File "/net/people/plgrid/plgkrzepk/Github/CLPIntervention2/scripts/python/run_exp_clp_mm_phase1_resnet18.py", line 122, in objective
+    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+  File "/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/site-packages/torch/serialization.py", line 791, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/site-packages/torch/serialization.py", line 271, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/net/tscratch/people/plgkrzepk/conda_envs/clpi_env/lib/python3.10/site-packages/torch/serialization.py", line 252, in __init__
+    super().__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: 'data/dual_cifar10_held_out_proper_x_left.pt'
+0.05 0.0
+Files already downloaded and verified
+overlap: 0.0 with_overlap: 0.5
+Files already downloaded and verified
+overlap: 0.0 with_overlap: 0.5
+Files already downloaded and verified
+overlap: 0.0 with_overlap: 0.5
+liczba parametrów 11849354
