@@ -1,11 +1,12 @@
 import torch
 
-from src.data.datasets import get_mnist, get_cifar10, get_cifar100, get_tinyimagenet, get_imagenet, get_cubbirds, get_food101, get_dual_cifar10
+from src.data.datasets import get_mnist, get_cifar10, get_cifar100, get_tinyimagenet, get_imagenet, get_cubbirds, get_food101, get_dual_fmnist, get_dual_cifar10
 from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss, BADGELoss
 from src.modules.architectures.models import MLP, MLPwithNorm, SimpleCNN, SimpleCNNwithNorm,\
     SimpleCNNwithDropout, SimpleCNNwithNormandDropout, DualSimpleCNN
 from src.modules.architectures.resnets import ResNet18, ResNet34
 from src.modules.architectures.mm_resnets import build_mm_resnet
+from src.modules.architectures.mm_mlp import MMMLPwithNorm
 from src.utils.utils_optim import MultiStepwithDoubleLinearWarmup
 from src.visualization.clearml_logger import ClearMLLogger
 from src.visualization.tensorboard_pytorch import TensorboardPyTorch
@@ -27,6 +28,7 @@ DATASET_NAME_MAP = {
     'imagenet': get_imagenet,
     'cubbirds': get_cubbirds,
     'food101': get_food101,
+    'dual_fmnist': get_dual_fmnist,
     'dual_cifar10': get_dual_cifar10,
 }
 
@@ -55,6 +57,7 @@ MODEL_NAME_MAP = {
     'simple_cnn_with_norm_and_dropout': SimpleCNNwithNormandDropout,
     'resnet18': ResNet18,
     'resnet34': ResNet34,
+    'mm_mlp_bn': MMMLPwithNorm,
     'dual_simple_cnn': DualSimpleCNN,
     'mm_resnet': build_mm_resnet
 }

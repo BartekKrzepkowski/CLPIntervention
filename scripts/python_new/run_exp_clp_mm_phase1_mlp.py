@@ -33,7 +33,7 @@ def objective(exp, epochs, lr, wd):
     OVERLAP = 0.0
     
     type_names = {
-        'model': 'mm_mlp',
+        'model': 'mm_mlp_bn',
         'criterion': 'cls',
         'dataset': 'dual_fmnist',
         'optim': 'sgd',
@@ -51,7 +51,8 @@ def objective(exp, epochs, lr, wd):
     
     
     
-    model_params = {'model_config': model_config, 'num_classes': NUM_CLASSES, 'dataset_name': type_names['dataset']}
+    layers_dim = [784, 512, 512, 512, 512, 512, 512, 10]
+    model_params = {'layers_dim': layers_dim, 'activation_name': 'relu'}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
     
@@ -114,9 +115,9 @@ def objective(exp, epochs, lr, wd):
     # DODAJ - POPRAWNE DANE
     print('liczba parametrów', sum(dict((p.data_ptr(), p.numel()) for p in model.parameters() if p.requires_grad).values()))
     held_out = {}
-    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
+    # held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+    # held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
+    # held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
     
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
@@ -182,7 +183,7 @@ def objective(exp, epochs, lr, wd):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = '/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports3'
+    config.base_path = '/shared/results/bartekk/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config

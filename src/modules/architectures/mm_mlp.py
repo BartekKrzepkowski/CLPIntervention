@@ -1,21 +1,37 @@
+from typing import List
+
 import torch
 
+from src.utils import common
 
 
-class MLP(torch.nn.Module):
+
+class MMMLPwithNorm(torch.nn.Module):
     def __init__(self, layers_dim: List[int], activation_name: str):
         super().__init__()
-        self.layers = torch.nn.ModuleList([
-            torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2), common.ACT_NAME_MAP[activation_name]())
-            for hidden_dim1, hidden_dim2 in zip(layers_dim[:-2], layers_dim[1:-1])
+        layers_dim1 = layers_dim[:len(layers_dim) // 2 + 1]
+        layers_dim2 = layers_dim[len(layers_dim) // 2 + 1:]
+        self.net1 = torch.nn.ModuleList([
+            torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2),
+                                torch.nn.BatchNorm1d(hidden_dim2),
+                                common.ACT_NAME_MAP[activation_name]())
+            for hidden_dim1, hidden_dim2 in zip(layers_dim1[:-1], layers_dim1[1:])
         ])
-        self.final_layer = torch.nn.Linear(layers_dim[-2], layers_dim[-1])
+        self.net1 = torch.nn.Sequential(*self.net1)
+        self.net2 = torch.nn.ModuleList([
+            torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2),
+                                torch.nn.BatchNorm1d(hidden_dim2),
+                                common.ACT_NAME_MAP[activation_name]())
+            for hidden_dim1, hidden_dim2 in zip(layers_dim1[:-2], layers_dim1[1:-1])
+        ])
+        self.net2 = torch.nn.Sequential(*self.net2)
+        self.fc = torch.nn.Linear(layers_dim[-2], layers_dim[-1])
 
     def forward(self, x):
         x = x.flatten(start_dim=1)
         for layer in self.layers:
             x = layer(x)
-        x = self.final_layer(x)
+        x = self.fc(x)
         return x
     
     def forward(self, x1, x2, left_branch_intervention=None, right_branch_intervention=None, enable_left_branch=True, enable_right_branch=True):

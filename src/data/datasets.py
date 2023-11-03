@@ -4,7 +4,8 @@ from torchvision import datasets, transforms
 from torchvision.transforms import InterpolationMode
 
 from src.data.datasets_class import SplitAndAugmentDataset
-from src.data.transforms import TRANSFORMS_NAME_MAP
+from src.data import transforms, transforms_fmnist
+
 
 DOWNLOAD = False
 
@@ -19,6 +20,22 @@ def get_mnist(dataset_path):
     train_eval_data = train_data
     test_data = datasets.MNIST(dataset_path, train=False, download=DOWNLOAD, transform=transform)
     return train_data, train_eval_data, test_data
+
+
+def get_dual_fmnist(dataset_path=None, whether_aug=True, proper_normalization=True, overlap=0.0, resize_factor=1/4):
+    dataset_path = dataset_path if dataset_path is not None else os.environ['FMNIST_PATH']
+    print(dataset_path)
+    
+    train_dataset = datasets.FashionMNIST(dataset_path, train=True, download=DOWNLOAD)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True)
+    
+    test_proper_dataset = datasets.FashionMNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False)
+    
+    test_blurred_dataset = datasets.FashionMNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_blurred'](28, 28, resize_factor, overlap), overlap=overlap, is_train=False)
+    
+    return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
 
 
 def get_cifar10(dataset_path=None, whether_aug=True, proper_normalization=True):
@@ -60,13 +77,13 @@ def get_dual_cifar10(dataset_path=None, whether_aug=True, proper_normalization=T
     dataset_path = dataset_path if dataset_path is not None else os.environ['CIFAR10_PATH']
     
     train_dataset = datasets.CIFAR10(dataset_path, train=True, download=True)
-    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True)
     
     test_proper_dataset = datasets.CIFAR10(dataset_path, train=False, download=True)
-    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False)
+    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False)
     
     test_blurred_dataset = datasets.CIFAR10(dataset_path, train=False, download=True)
-    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), TRANSFORMS_NAME_MAP['transform_eval_blurred'](32, 32, resize_factor, overlap), overlap=overlap, is_train=False)
+    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms.TRANSFORMS_NAME_MAP['transform_eval_blurred'](32, 32, resize_factor, overlap), overlap=overlap, is_train=False)
     
     return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
 
