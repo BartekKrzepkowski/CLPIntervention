@@ -12,6 +12,7 @@ import omegaconf
 # from rich.traceback import install
 # install(show_locals=True)
 
+from src.data import transforms, transforms_fmnist
 from src.utils.prepare import prepare_model, prepare_loaders_clp, prepare_criterion, prepare_optim_and_scheduler
 from src.utils.utils_trainer import manual_seed
 from src.utils.utils_visualisation import ee_tensorboard_layout
@@ -22,7 +23,7 @@ from src.modules.metrics import RunStatsBiModal
 # TODO: 1) Napisz mm_mlp, 2) Napisz Dual_fminst
 
 
-def objective(exp, epochs, lr, wd):
+def objective(exp, epochs, lr, wd, init):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -50,12 +51,12 @@ def objective(exp, epochs, lr, wd):
     # ════════════════════════ prepare model ════════════════════════ #
     
     
-    
-    layers_dim = [784, 512, 512, 512, 512, 512, 512, 10]
+    layers_dim = [392, 512, 512, 512, 512, 512, 512, 512, 10]
     model_params = {'layers_dim': layers_dim, 'activation_name': 'relu'}
     
-    model = prepare_model(type_names['model'], model_params=model_params).to(device)
-    
+    model = prepare_model(type_names['model'], model_params=model_params, init=init).to(device)
+    print(model)
+        
     
     # ════════════════════════ prepare criterion ════════════════════════ #
     
@@ -75,6 +76,7 @@ def objective(exp, epochs, lr, wd):
     loader_params = {'batch_size': 125, 'pin_memory': True, 'num_workers': 8}
     
     loaders = prepare_loaders_clp(type_names['dataset'], dataset_params=dataset_params, loader_params=loader_params)
+    loaders['train'].dataset.transform2 = transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_blurred'](28, 28, 1/4, OVERLAP)
     
     
     # ════════════════════════ prepare optimizer & scheduler ════════════════════════ #
@@ -95,7 +97,7 @@ def objective(exp, epochs, lr, wd):
     
     ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
-    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}'
+    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}_init_{init}'
     EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase1'
 
     h_params_overall = {
@@ -207,7 +209,8 @@ def objective(exp, epochs, lr, wd):
 
 if __name__ == "__main__":
     lr = float(sys.argv[1])
-    wd = float(sys.argv[2])
+    init = str(sys.argv[2])
+    wd = 0.0
     print(lr, wd)
-    EPOCHS = 300
-    objective('deficit_reverse', EPOCHS, lr, wd)
+    EPOCHS = 500
+    objective('deficit_reverse', EPOCHS, lr, wd, init)

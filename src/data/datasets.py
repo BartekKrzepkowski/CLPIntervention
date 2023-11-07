@@ -4,7 +4,7 @@ from torchvision import datasets, transforms
 from torchvision.transforms import InterpolationMode
 
 from src.data.datasets_class import SplitAndAugmentDataset
-from src.data import transforms, transforms_fmnist
+from src.data import transforms, transforms_mnist, transforms_fmnist, transforms_svhn, transforms_kmnist
 
 
 DOWNLOAD = False
@@ -22,6 +22,38 @@ def get_mnist(dataset_path):
     return train_data, train_eval_data, test_data
 
 
+def get_dual_mnist(dataset_path=None, whether_aug=True, proper_normalization=True, overlap=0.0, resize_factor=1/4):
+    dataset_path = dataset_path if dataset_path is not None else os.environ['MNIST_PATH']
+    print(dataset_path)
+    
+    train_dataset = datasets.MNIST(dataset_path, train=True, download=DOWNLOAD)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_mnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_mnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True, reverse=False)
+    
+    test_proper_dataset = datasets.MNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms_mnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_mnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False, reverse=False)
+    
+    test_blurred_dataset = datasets.MNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms_mnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_mnist.TRANSFORMS_NAME_MAP['transform_eval_blurred'](28, 28, resize_factor, overlap), overlap=overlap, is_train=False, reverse=False)
+    
+    return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
+
+
+def get_dual_kmnist(dataset_path=None, whether_aug=True, proper_normalization=True, overlap=0.0, resize_factor=1/4):
+    dataset_path = dataset_path if dataset_path is not None else os.environ['KMNIST_PATH']
+    print(dataset_path)
+    
+    train_dataset = datasets.KMNIST(dataset_path, train=True, download=DOWNLOAD)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_kmnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_kmnist.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True, reverse=False)
+    
+    test_proper_dataset = datasets.KMNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms_kmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_kmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False, reverse=False)
+    
+    test_blurred_dataset = datasets.KMNIST(dataset_path, train=False, download=DOWNLOAD)
+    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms_kmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_kmnist.TRANSFORMS_NAME_MAP['transform_eval_blurred'](28, 28, resize_factor, overlap), overlap=overlap, is_train=False, reverse=False)
+    
+    return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
+
+
 def get_dual_fmnist(dataset_path=None, whether_aug=True, proper_normalization=True, overlap=0.0, resize_factor=1/4):
     dataset_path = dataset_path if dataset_path is not None else os.environ['FMNIST_PATH']
     print(dataset_path)
@@ -34,6 +66,21 @@ def get_dual_fmnist(dataset_path=None, whether_aug=True, proper_normalization=Tr
     
     test_blurred_dataset = datasets.FashionMNIST(dataset_path, train=False, download=DOWNLOAD)
     test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_fmnist.TRANSFORMS_NAME_MAP['transform_eval_blurred'](28, 28, resize_factor, overlap), overlap=overlap, is_train=False)
+    
+    return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
+
+
+def get_dual_svhn(dataset_path=None, whether_aug=True, proper_normalization=True, overlap=0.0, resize_factor=1/4):
+    dataset_path = dataset_path if dataset_path is not None else os.environ['SVHN_PATH']
+    
+    train_dataset = datasets.SVHN(dataset_path, split='train', download=DOWNLOAD)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_svhn.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_svhn.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True, reverse=False)
+    
+    test_proper_dataset = datasets.SVHN(dataset_path, split='test', download=DOWNLOAD)
+    test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms_svhn.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_svhn.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False, reverse=False)
+    
+    test_blurred_dataset = datasets.SVHN(dataset_path, split='test', download=DOWNLOAD)
+    test_blurred_dual_augment_dataset = SplitAndAugmentDataset(test_blurred_dataset, transforms_svhn.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_svhn.TRANSFORMS_NAME_MAP['transform_eval_blurred'](32, 32, resize_factor, overlap), overlap=overlap, is_train=False, reverse=False)
     
     return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
 

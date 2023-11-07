@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm, trange
 
 from src.data.loaders import Loaders
-from src.data.transforms import TRANSFORMS_NAME_MAP
+# from src.data.transforms import TRANSFORMS_NAME_MAP
 from src.modules.metrics import RunStatsBiModal
 from src.utils.common import LOGGERS_NAME_MAP
 
@@ -53,20 +53,12 @@ class TrainerClassification:
         
     def run_exp1_reverse(self, config):       
         self.manual_seed(config)
-        self.at_exp_start(config)
-
-        if config.checkpoint_path is None:
-            if config.extra['window'] != 0:
-                print('Entering proper phase!!!')
-                self.run_loop(config.epoch_start_at - config.extra['window'], config.epoch_start_at, config)
-                print('Leaving proper phase!!!')
-        else:
-            self.model = load_model(self.model, config.checkpoint_path)            
+        self.at_exp_start(config)        
 
         print('Entering deficit phase!!!')
         self.criterion.fpw = 0.0
         config.kind = 'blurred'
-        self.loaders['train'].dataset.transform2 = TRANSFORMS_NAME_MAP['transform_train_blurred'](32, 32, 1/4, config.extra['overlap'])
+        
         self.run_loop(config.epoch_start_at, config.epoch_end_at, config)
 
         step = f'epoch_{self.epoch + 1}'
@@ -117,9 +109,6 @@ class TrainerClassification:
     def run_exp4(self, config):        
         self.manual_seed(config)
         self.at_exp_start(config)
-        
-        if config.checkpoint_path is not None:
-            self.model = load_model(self.model, config.checkpoint_path)
 
         # self.criterion.fpw = 0.0
         config.kind = 'proper'

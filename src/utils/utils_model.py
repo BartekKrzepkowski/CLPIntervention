@@ -14,6 +14,11 @@ def init_with_kaiming_normal_fan_in(m):
         torch.nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in', nonlinearity='relu')
         torch.nn.init.zeros_(m.bias)
         
+def init_with_kaiming_normal_fan_out(m):
+    if isinstance(m, torch.nn.Linear):
+        torch.nn.init.kaiming_normal_(m.weight, a=0, mode='fan_out', nonlinearity='relu')
+        torch.nn.init.zeros_(m.bias)
+        
 def basic_initialization(m):
     if isinstance(m, torch.nn.Conv2d):
         torch.nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in', nonlinearity='relu')

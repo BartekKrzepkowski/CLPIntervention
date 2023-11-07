@@ -33,9 +33,9 @@ def objective(exp, epochs, lr, wd):
     OVERLAP = 0.0
     
     type_names = {
-        'model': 'mm_simplecnn',
+        'model': 'mm_simple_cnn',
         'criterion': 'cls',
-        'dataset': 'dual_fmnist',
+        'dataset': 'dual_svhn',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -51,9 +51,14 @@ def objective(exp, epochs, lr, wd):
     
     
     
-    model_params = {'model_config': model_config, 'num_classes': NUM_CLASSES, 'dataset_name': type_names['dataset']}
+    N = 1
+    NUM_FEATURES = 3
+    DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
+    CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
+    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
+    print(model)
     
     
     # ════════════════════════ prepare criterion ════════════════════════ #
@@ -182,7 +187,7 @@ def objective(exp, epochs, lr, wd):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = '/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports3'
+    config.base_path = '/shared/results/bartekk/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config

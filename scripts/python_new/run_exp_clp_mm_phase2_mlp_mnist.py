@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 from collections import defaultdict
 
 import numpy as np
@@ -11,6 +12,7 @@ import omegaconf
 # from rich.traceback import install
 # install(show_locals=True)
 
+from src.data import transforms, transforms_fmnist
 from src.utils.prepare import prepare_model, prepare_loaders_clp, prepare_criterion, prepare_optim_and_scheduler
 from src.utils.utils_trainer import manual_seed
 from src.utils.utils_visualisation import ee_tensorboard_layout
@@ -18,8 +20,10 @@ from src.trainer.trainer_classification_dual_clp import TrainerClassification
 from src.modules.aux_modules import TraceFIM
 from src.modules.metrics import RunStatsBiModal
 
+# TODO: 1) Napisz mm_mlp, 2) Napisz Dual_fminst
 
-def objective(exp, window, epochs):
+
+def objective(exp, epochs, lr, wd, init, hidden_dim, N):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -30,11 +34,11 @@ def objective(exp, window, epochs):
     OVERLAP = 0.0
     
     type_names = {
-        'model': 'dual_simple_cnn',
+        'model': 'mm_mlp_bn',
         'criterion': 'cls',
-        'dataset': 'dual_cifar10',
+        'dataset': 'dual_mnist',
         'optim': 'sgd',
-        'scheduler': None
+        'scheduler': 'multiplicative'
     }
     
     
@@ -46,15 +50,13 @@ def objective(exp, window, epochs):
     
     # ════════════════════════ prepare model ════════════════════════ #
     
-    model_checkpoint = '/shared/results/bartekk/reports/deficit_reverse, sgd, dual_cifar10, mm_resnet_fp_0.0_lr_0.6_wd_0.0_lr_lambda_1.0 overlap=0.0, phase1/2023-11-03_14-59-50/checkpoints/model_step_epoch_80.pth'
-    N = 1
-    NUM_FEATURES = 3
-    DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
-    CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
-    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP}
     
-    model = prepare_model(type_names['model'], model_params=model_params, model_path=model_checkpoint).to(device)
+    layers_dim = [392] + [hidden_dim] * N + [10]
+    model_params = {'layers_dim': layers_dim, 'activation_name': 'relu'}
     
+    model = prepare_model(type_names['model'], model_params=model_params, init=init).to(device)
+    print(model)
+        
     
     # ════════════════════════ prepare criterion ════════════════════════ #
     
@@ -74,32 +76,29 @@ def objective(exp, window, epochs):
     loader_params = {'batch_size': 125, 'pin_memory': True, 'num_workers': 8}
     
     loaders = prepare_loaders_clp(type_names['dataset'], dataset_params=dataset_params, loader_params=loader_params)
+    # loaders['train'].dataset.transform2 = transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_blurred'](28, 28, 1/4, OVERLAP)
     
     
     # ════════════════════════ prepare optimizer & scheduler ════════════════════════ #
     
     
-    LR = 2e-1
+    LR = lr
     MOMENTUM = 0.0
-    WD = 0.0
-    T_max = (len(loaders['train']) // GRAD_ACCUM_STEPS) * (window + epochs)
-    # print(T_max//window, T_max-3*T_max//window, 3*T_max//window)
-    # h_params_overall['scheduler'] = {'eta_max':LR, 'eta_medium':1e-2, 'eta_min':1e-6, 'warmup_iters2': 3*T_max//window, 'inter_warmups_iters': T_max-3*T_max//window, 'warmup_iters1': 3*T_max//window, 'milestones':[], 'gamma':1e-1}
-    optim_params = {'lr': LR, 'momentum': MOMENTUM, 'weight_decay': WD}
-    scheduler_params = None
+    WD = wd
+    LR_LAMBDA = 1.0
+    T_max = (len(loaders['train']) // GRAD_ACCUM_STEPS) * epochs
+    optim_params = {'lr': LR, 'weight_decay': WD}
+    scheduler_params = {'lr_lambda': lambda epoch: LR_LAMBDA}
     
     optim, lr_scheduler = prepare_optim_and_scheduler(model, optim_name=type_names['optim'], optim_params=optim_params, scheduler_name=type_names['scheduler'], scheduler_params=scheduler_params)
-    
+    scheduler_params['lr_lambda'] = LR_LAMBDA # problem with omegacong with primitive type
     
     # ════════════════════════ prepare wandb params ════════════════════════ #
     
-    window1 = 80
-    window2 = 0
-    quick_name = f'intervention deactivation, trained with phase1={window1} and phase2={window2} '
-    ENTITY_NAME = 'ideas_cv'
+    ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
-    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}'
-    EXP_NAME = f'{GROUP_NAME}_window_{window} overlap={OVERLAP}, both enabled, {quick_name}'
+    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}_init_{init}_hidden_{hidden_dim}_N_{N}'
+    EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase2'
 
     h_params_overall = {
         'model': model_params,
@@ -118,17 +117,17 @@ def objective(exp, window, epochs):
     # DODAJ - POPRAWNE DANE
     print('liczba parametrów', sum(dict((p.data_ptr(), p.numel()) for p in model.parameters() if p.requires_grad).values()))
     held_out = {}
-    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
+    # held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+    # held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
+    # held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
     
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
     
     
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
-    extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=NUM_CLASSES)
+    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=NUM_CLASSES)
     
     
     # ════════════════════════ prepare trainer ════════════════════════ #
@@ -162,11 +161,11 @@ def objective(exp, window, epochs):
                      'layout': ee_tensorboard_layout(params_names), # is it necessary?
                      'mode': 'online',
     }
-    extra = {'window': window,
+    extra = {'window': 0,
              'overlap': OVERLAP,
-             'left_branch_intervention': 'deactivation',
+             'left_branch_intervention': None,
              'right_branch_intervention': None,
-             'enable_left_branch': False,
+             'enable_left_branch': True,
              'enable_right_branch': True
     }
     
@@ -179,17 +178,18 @@ def objective(exp, window, epochs):
     config.log_multi = 1#(T_max // epochs) // 10
     config.save_multi = 0#T_max // 10
     # config.stiff_multi = (T_max // (window + epochs)) // 2
-    config.fim_trace_multi = (T_max // (window + epochs)) // 2
-    config.run_stats_multi = (T_max // (window + epochs)) // 2
+    config.fim_trace_multi = (T_max // epochs) // 2
+    config.run_stats_multi = (T_max // epochs) // 2
     
     config.clip_value = CLIP_VALUE
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = 'reports'
+    config.base_path = '/shared/results/bartekk/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
+    config.checkpoint_path = None
     
     
     # ════════════════════════ run ════════════════════════ #
@@ -201,8 +201,6 @@ def objective(exp, window, epochs):
         trainer.run_exp2(config)
     elif exp == 'deficit_reverse':
         trainer.run_exp1_reverse(config)
-    elif exp == 'intervention':
-        trainer.run_exp3(config)
     elif exp == 'just_run':
         trainer.run_exp4(config)
     else:
@@ -210,6 +208,11 @@ def objective(exp, window, epochs):
 
 
 if __name__ == "__main__":
-    EPOCHS = 250
-    window = 0
-    objective('just_run', int(window), EPOCHS)
+    lr = float(sys.argv[1])
+    init = str(sys.argv[2])
+    hidden_dim = int(sys.argv[3])
+    N = int(sys.argv[4])
+    wd = 0.0
+    print(lr, wd)
+    EPOCHS = 500
+    objective('just_run', EPOCHS, lr, wd, init, hidden_dim, N)

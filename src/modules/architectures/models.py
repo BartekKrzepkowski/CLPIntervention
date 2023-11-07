@@ -195,7 +195,8 @@ class DualSimpleCNN(torch.nn.Module):
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
         
-        x1 = torch.randn(1, 3, 32, ceil(32 * (overlap / 2 + 0.5)))
+        x1 = torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
+        # x1 = torch.randn(1, 3, 32, ceil(32 * (overlap / 2 + 0.5)))
         for block in self.net1:
             x1 = block(x1)
         _, self.channels_out, self.height, self.width = x1.shape

@@ -7,10 +7,12 @@ from src.utils import common
 
 
 class MMMLPwithNorm(torch.nn.Module):
-    def __init__(self, layers_dim: List[int], activation_name: str):
+    def __init__(self, layers_dim: List[int], activation_name: str, scaling_factor: int = 1, eps: float = 0.0):
         super().__init__()
-        layers_dim1 = layers_dim[:len(layers_dim) // 2 + 1]
-        layers_dim2 = layers_dim[len(layers_dim) // 2 + 1:]
+        self.scaling_factor = scaling_factor
+        self.eps = eps
+        layers_dim1 = layers_dim[:len(layers_dim) // 2]
+        layers_dim2 = layers_dim[len(layers_dim) // 2:]
         self.net1 = torch.nn.ModuleList([
             torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2),
                                 torch.nn.BatchNorm1d(hidden_dim2),
@@ -22,24 +24,25 @@ class MMMLPwithNorm(torch.nn.Module):
             torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2),
                                 torch.nn.BatchNorm1d(hidden_dim2),
                                 common.ACT_NAME_MAP[activation_name]())
-            for hidden_dim1, hidden_dim2 in zip(layers_dim1[:-2], layers_dim1[1:-1])
+            for hidden_dim1, hidden_dim2 in zip(layers_dim1[:-1], layers_dim1[1:])
         ])
         self.net2 = torch.nn.Sequential(*self.net2)
+        self.net3 = torch.nn.ModuleList([
+            torch.nn.Sequential(torch.nn.Linear(hidden_dim1, hidden_dim2),
+                                torch.nn.BatchNorm1d(hidden_dim2),
+                                common.ACT_NAME_MAP[activation_name]())
+            for hidden_dim1, hidden_dim2 in zip(layers_dim2[:-2], layers_dim2[1:-1])
+        ])
+        self.net3 = torch.nn.Sequential(*self.net3)
         self.fc = torch.nn.Linear(layers_dim[-2], layers_dim[-1])
-
-    def forward(self, x):
-        x = x.flatten(start_dim=1)
-        for layer in self.layers:
-            x = layer(x)
-        x = self.fc(x)
-        return x
+        
     
     def forward(self, x1, x2, left_branch_intervention=None, right_branch_intervention=None, enable_left_branch=True, enable_right_branch=True):
         assert left_branch_intervention is None or right_branch_intervention is None, "At least one branchnet should be left intact"
         assert enable_left_branch or enable_right_branch, "At least one branchnet should be enabled"
         
-        x1 = x2.flatten(start_dim=1)
-        x1 = x2.flatten(start_dim=1)
+        x1 = x1.flatten(start_dim=1)
+        x2 = x2.flatten(start_dim=1)
         
         if enable_left_branch:
             if left_branch_intervention == "occlusion":
@@ -73,7 +76,5 @@ class MMMLPwithNorm(torch.nn.Module):
             
         y = torch.cat((x1, x2), dim=-1) if self.scaling_factor == 2 else x1 + x2
         y = self.net3(y)
-        y = self.avgpool(y)
-        y = torch.flatten(y, 1)
         y = self.fc(y)
         return y

@@ -1,6 +1,7 @@
 import torch
 
-from src.data.datasets import get_mnist, get_cifar10, get_cifar100, get_tinyimagenet, get_imagenet, get_cubbirds, get_food101, get_dual_fmnist, get_dual_cifar10
+from src.data.datasets import get_mnist, get_cifar10, get_cifar100, get_tinyimagenet, get_imagenet, get_cubbirds, get_food101,\
+    get_dual_mnist, get_dual_fmnist, get_dual_cifar10, get_dual_svhn, get_dual_kmnist
 from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss, BADGELoss
 from src.modules.architectures.models import MLP, MLPwithNorm, SimpleCNN, SimpleCNNwithNorm,\
     SimpleCNNwithDropout, SimpleCNNwithNormandDropout, DualSimpleCNN
@@ -28,7 +29,10 @@ DATASET_NAME_MAP = {
     'imagenet': get_imagenet,
     'cubbirds': get_cubbirds,
     'food101': get_food101,
+    'dual_mnist': get_dual_mnist,
     'dual_fmnist': get_dual_fmnist,
+    'dual_kmnist': get_dual_kmnist,
+    'dual_svhn': get_dual_svhn,
     'dual_cifar10': get_dual_cifar10,
 }
 
@@ -58,7 +62,7 @@ MODEL_NAME_MAP = {
     'resnet18': ResNet18,
     'resnet34': ResNet34,
     'mm_mlp_bn': MMMLPwithNorm,
-    'dual_simple_cnn': DualSimpleCNN,
+    'mm_simple_cnn': DualSimpleCNN,
     'mm_resnet': build_mm_resnet
 }
 

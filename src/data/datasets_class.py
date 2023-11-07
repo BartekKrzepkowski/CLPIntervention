@@ -23,12 +23,13 @@ class DualAugmentDataset(Dataset):
     
 import math
 class SplitAndAugmentDataset(Dataset):
-    def __init__(self, dataset, transform1, transform2, overlap=0.5, is_train=True):
+    def __init__(self, dataset, transform1, transform2, overlap=0.5, is_train=True, reverse=True):
         self.dataset = dataset
         self.transform1 = transform1
         self.transform2 = transform2
         self.with_overlap = overlap / 2 + 0.5
         self.is_train = is_train
+        self.reverse = reverse
         print('overlap:', overlap, 'with_overlap:', self.with_overlap)
 
     def __len__(self):
@@ -38,7 +39,7 @@ class SplitAndAugmentDataset(Dataset):
         image, label = self.dataset[idx]
         
         # Split the image into two halves with overlap
-        if self.is_train:
+        if self.is_train and self.reverse:
             if torch.rand(1) > 0.5:
                 # reverse image horizontally
                 image = image.transpose(Image.FLIP_LEFT_RIGHT)

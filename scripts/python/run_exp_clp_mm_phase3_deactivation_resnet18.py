@@ -57,7 +57,8 @@ def objective(exp, epochs, lr, wd, phase1):
                     'overlap': OVERLAP,}
     model_params = {'model_config': model_config, 'num_classes': NUM_CLASSES, 'dataset_name': type_names['dataset']}
     
-    model = prepare_model(type_names['model'], model_params=model_params).to(device)
+    model_checkpoint = f'/shared/results/bartekk/reports/deficit_reverse, sgd, dual_cifar10, mm_resnet_fp_0.0_lr_0.6_wd_0.0_lr_lambda_1.0 overlap=0.0, phase1/2023-11-03_14-59-50/checkpoints/model_step_epoch_{phase1}.pth'
+    model = prepare_model(type_names['model'], model_params=model_params, model_path=model_checkpoint).to(device)
     
     
     # ════════════════════════ prepare criterion ════════════════════════ #
@@ -96,10 +97,9 @@ def objective(exp, epochs, lr, wd, phase1):
     
     # ════════════════════════ prepare wandb params ════════════════════════ #
     
-    checkpoint_path = f'/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports/deficit_reverse, sgd, dual_cifar10, mm_resnet_fp_0.0_lr_0.5_wd_0.0001_lr_lambda_0.98 overlap=0.0, phase1/2023-09-21_22-54-42/checkpoints/model_step_epoch_{phase1}.pth'
     phase2 = 0
-    quick_name = f'intervention deactivation, trained with phase1={phase1} and phase2={phase2} '
-    ENTITY_NAME = 'ideas_cv'
+    quick_name = f'intervention deactivation, trained with phase1={phase1} and phase2={phase2}'
+    ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
     GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}'
     EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase3, {quick_name}'
@@ -121,17 +121,17 @@ def objective(exp, epochs, lr, wd, phase1):
     # DODAJ - POPRAWNE DANE
     print('liczba parametrów', sum(dict((p.data_ptr(), p.numel()) for p in model.parameters() if p.requires_grad).values()))
     held_out = {}
-    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
+    # held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+    # held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
+    # held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
     
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
     
     
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
-    extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=NUM_CLASSES)
+    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=NUM_CLASSES)
     
     
     # ════════════════════════ prepare trainer ════════════════════════ #
@@ -189,11 +189,10 @@ def objective(exp, epochs, lr, wd, phase1):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = '/net/pr2/projects/plgrid/plgg_ccbench/bartek/reports'
+    config.base_path = '/shared/results/bartekk/reports'
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
-    config.checkpoint_path = checkpoint_path
     
     
     # ════════════════════════ run ════════════════════════ #
