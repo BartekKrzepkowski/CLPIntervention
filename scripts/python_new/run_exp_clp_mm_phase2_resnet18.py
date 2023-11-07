@@ -34,7 +34,7 @@ def objective(exp, epochs, lr, wd, N):
     OVERLAP = 0.0
     
     type_names = {
-        'model': 'mm_simple_cnn',
+        'model': 'mm_resnet',
         'criterion': 'cls',
         'dataset': 'dual_svhn',
         'optim': 'sgd',
@@ -52,11 +52,15 @@ def objective(exp, epochs, lr, wd, N):
     
     
     
-    N = N
-    NUM_FEATURES = 3
-    DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
-    CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
-    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
+    model_config = {'backbone_type': 'resnet18',
+                    'only_features': False,
+                    'batchnorm_layers': True,
+                    'width_scale': 1.0,
+                    'skips': True,
+                    'modify_resnet': True,
+                    'wheter_concate': False,
+                    'overlap': OVERLAP,}
+    model_params = {'model_config': model_config, 'num_classes': NUM_CLASSES, 'dataset_name': type_names['dataset']}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
     # print(model)

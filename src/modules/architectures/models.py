@@ -168,7 +168,8 @@ class SimpleCNNwithNormandDropout(torch.nn.Module):
     
     
 class DualSimpleCNN(torch.nn.Module):
-    def __init__(self, layers_dim: List[int], activation_name: str, conv_params: Dict[str, Any], wheter_concate: bool = False, pre_mlp_depth: int = 1, eps: float = 1e-5, overlap: float = 0.0):
+    def __init__(self, layers_dim: List[int], activation_name: str, conv_params: Dict[str, Any], wheter_concate: bool = False,
+                 pre_mlp_depth: int = 1, eps: float = 1e-5, overlap: float = 0.0, num_features: int = 1):
         from math import ceil
         super().__init__()
         self.eps = eps
@@ -195,8 +196,8 @@ class DualSimpleCNN(torch.nn.Module):
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
         
-        x1 = torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
-        # x1 = torch.randn(1, 3, 32, ceil(32 * (overlap / 2 + 0.5)))
+        # x1 = torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
+        x1 = torch.randn(1, 3, 32, ceil(32 * (overlap / 2 + 0.5))) if num_features == 3 else torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
         for block in self.net1:
             x1 = block(x1)
         _, self.channels_out, self.height, self.width = x1.shape

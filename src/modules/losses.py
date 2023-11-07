@@ -8,9 +8,9 @@ from src.utils import common
 
 
 class ClassificationLoss(torch.nn.Module):
-    def __init__(self, criterion_name):
+    def __init__(self, criterion_name, weight=None):
         super().__init__()
-        self.criterion = common.LOSS_NAME_MAP[criterion_name]()
+        self.criterion = common.LOSS_NAME_MAP[criterion_name](weight=weight)
 
     def forward(self, y_pred, y_true):
         loss = self.criterion(y_pred, y_true)
