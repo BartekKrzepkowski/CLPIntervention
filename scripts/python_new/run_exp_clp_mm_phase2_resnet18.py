@@ -195,7 +195,7 @@ def objective(exp, epochs, lr, wd, N):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = '/home/barkrz/reports'
+    config.base_path = os.environ['REPORTS_DIR']
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config

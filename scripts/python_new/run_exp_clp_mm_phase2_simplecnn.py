@@ -36,7 +36,7 @@ def objective(exp, epochs, lr, wd, N):
     type_names = {
         'model': 'mm_simple_cnn',
         'criterion': 'cls',
-        'dataset': 'dual_svhn',
+        'dataset': 'dual_fmnist',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -53,7 +53,7 @@ def objective(exp, epochs, lr, wd, N):
     
     
     N = N
-    NUM_FEATURES = 3
+    NUM_FEATURES = 1
     DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
     CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
     model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
@@ -218,5 +218,5 @@ if __name__ == "__main__":
     wd = float(sys.argv[2])
     N = int(sys.argv[3])
     print(lr, wd)
-    EPOCHS = 300
+    EPOCHS = 250
     objective('just_run', EPOCHS, lr, wd, N)
