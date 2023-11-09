@@ -12,6 +12,7 @@ import omegaconf
 # from rich.traceback import install
 # install(show_locals=True)
 
+from src.data import transforms_fmnist
 from src.utils.prepare import prepare_model, prepare_loaders_clp, prepare_criterion, prepare_optim_and_scheduler
 from src.utils.utils_trainer import manual_seed
 from src.utils.utils_visualisation import ee_tensorboard_layout
@@ -22,11 +23,12 @@ from src.modules.metrics import RunStatsBiModal
 # TODO: 1) Napisz mm_simplecnn, 2) Napisz Dual_fminst
 
 
-def objective(exp, epochs, lr, wd):
+def objective(exp, epochs, lr, wd, N):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print('device', device)
     GRAD_ACCUM_STEPS = 1
     NUM_CLASSES = 10
     RANDOM_SEED = 83
@@ -35,7 +37,7 @@ def objective(exp, epochs, lr, wd):
     type_names = {
         'model': 'mm_simple_cnn',
         'criterion': 'cls',
-        'dataset': 'dual_svhn',
+        'dataset': 'dual_fmnist',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -51,25 +53,14 @@ def objective(exp, epochs, lr, wd):
     
     
     
-    N = 1
-    NUM_FEATURES = 3
-    DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
+    N = N
+    NUM_FEATURES = 1
+    DIMS = [NUM_FEATURES, 64] + [256] * N + [128, NUM_CLASSES]
     CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
-    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP}
+    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
     print(model)
-    
-    
-    # ════════════════════════ prepare criterion ════════════════════════ #
-    
-    FP = 0.0
-    criterion_params = {'criterion_name': 'ce'}
-    
-    criterion = prepare_criterion(type_names['criterion'], criterion_params=criterion_params)
-    
-    
-    criterion_params['model'] = None
     
     
     # ════════════════════════ prepare loaders ════════════════════════ #
@@ -79,6 +70,21 @@ def objective(exp, epochs, lr, wd):
     loader_params = {'batch_size': 125, 'pin_memory': True, 'num_workers': 8}
     
     loaders = prepare_loaders_clp(type_names['dataset'], dataset_params=dataset_params, loader_params=loader_params)
+    loaders['train'].dataset.transform2 = transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_blurred'](32, 32, 1/4, OVERLAP)
+    
+    
+    # ════════════════════════ prepare criterion ════════════════════════ #
+    
+    
+    class_counts = [0] * 10
+    for _, label in loaders['train'].dataset:
+        class_counts[label] += 1
+    print(class_counts)
+    samples_weights = torch.tensor([1 / class_counts[i] for i in range(len(class_counts))]).to(device)
+    FP = 0.0
+    criterion_params = {'criterion_name': 'ce', 'weight': samples_weights}
+    criterion = prepare_criterion(type_names['criterion'], criterion_params=criterion_params)
+    criterion_params['weight'] = samples_weights.tolist()
     
     
     # ════════════════════════ prepare optimizer & scheduler ════════════════════════ #
@@ -99,7 +105,7 @@ def objective(exp, epochs, lr, wd):
     
     ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
-    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}'
+    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}_N_{N}'
     EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase1'
 
     h_params_overall = {
@@ -119,9 +125,9 @@ def objective(exp, epochs, lr, wd):
     # DODAJ - POPRAWNE DANE
     print('liczba parametrów', sum(dict((p.data_ptr(), p.numel()) for p in model.parameters() if p.requires_grad).values()))
     held_out = {}
-    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
+    # held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+    # held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
+    # held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
     
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
@@ -187,7 +193,7 @@ def objective(exp, epochs, lr, wd):
     config.random_seed = RANDOM_SEED
     config.whether_disable_tqdm = True
     
-    config.base_path = '/shared/results/bartekk/reports'
+    config.base_path = os.environ['REPORTS_DIR']
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
@@ -212,6 +218,7 @@ def objective(exp, epochs, lr, wd):
 if __name__ == "__main__":
     lr = float(sys.argv[1])
     wd = float(sys.argv[2])
+    N = int(sys.argv[3])
     print(lr, wd)
-    EPOCHS = 300
-    objective('deficit_reverse', EPOCHS, lr, wd)
+    EPOCHS = 400
+    objective('deficit_reverse', EPOCHS, lr, wd, N)

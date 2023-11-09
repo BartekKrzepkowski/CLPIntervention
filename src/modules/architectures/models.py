@@ -182,7 +182,8 @@ class DualSimpleCNN(torch.nn.Module):
                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.MaxPool2d(2, 2))
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2),
+                                torch.nn.BatchNorm2d(layer_dim2))
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
         self.net2 = torch.nn.ModuleList([
@@ -192,7 +193,8 @@ class DualSimpleCNN(torch.nn.Module):
                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.MaxPool2d(2, 2))
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2),
+                                torch.nn.BatchNorm2d(layer_dim2))
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
         
@@ -202,18 +204,22 @@ class DualSimpleCNN(torch.nn.Module):
             x1 = block(x1)
         _, self.channels_out, self.height, self.width = x1.shape
         pre_mlp_channels = self.channels_out * self.scaling_factor
-        flatten_dim = int(self.height * self.width * pre_mlp_channels)
+        pre_mlp = [pre_mlp_channels for i in range(pre_mlp_depth + 1)]
+        print(pre_mlp)
+        flatten_dim = int(self.height * self.width * pre_mlp[-1])
         
         self.net3 = torch.nn.ModuleList([
-            torch.nn.Sequential(torch.nn.Conv2d(pre_mlp_channels, pre_mlp_channels, 3, padding=1),
-                                torch.nn.BatchNorm2d(pre_mlp_channels),
+            torch.nn.Sequential(torch.nn.Conv2d(pre_mlp[i], pre_mlp[i+1], 3, padding=1),
+                                torch.nn.BatchNorm2d(pre_mlp[i+1]),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(pre_mlp_channels, pre_mlp_channels, 3, padding=1),
-                                torch.nn.BatchNorm2d(pre_mlp_channels),
+                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1),
+                                torch.nn.BatchNorm2d(pre_mlp[i+1]),
                                 common.ACT_NAME_MAP[activation_name](),
-                                # torch.nn.MaxPool2d(2, 2)
+                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1),
+                                torch.nn.BatchNorm2d(pre_mlp[i+1]),
+                                common.ACT_NAME_MAP[activation_name]()
                             )
-            for _ in range(pre_mlp_depth)
+            for i in range(pre_mlp_depth)
         ])
         self.final_layer = torch.nn.Sequential(torch.nn.Linear(flatten_dim, layers_dim[-2]),
                                                torch.nn.BatchNorm1d(layers_dim[-2]),
