@@ -19,15 +19,12 @@ from src.trainer.trainer_classification_dual_clp import TrainerClassification
 from src.modules.aux_modules import TraceFIM
 from src.modules.metrics import RunStatsBiModal
 
-# TODO: 1) Napisz mm_simplecnn, 2) Napisz Dual_fminst
 
-
-def objective(exp, epochs, lr, wd, N):
+def objective(exp, epochs, lr, wd, phase1):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print('device', device)
     GRAD_ACCUM_STEPS = 1
     NUM_CLASSES = 10
     RANDOM_SEED = 83
@@ -51,15 +48,15 @@ def objective(exp, epochs, lr, wd, N):
     # ════════════════════════ prepare model ════════════════════════ #
     
     
-    
     N = N
     NUM_FEATURES = 1
-    DIMS = [NUM_FEATURES, 32] + [64] * N + [128, NUM_CLASSES]
+    DIMS = [NUM_FEATURES, 32] + [256] * N + [128, NUM_CLASSES]
     CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
     model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
     
-    model = prepare_model(type_names['model'], model_params=model_params).to(device)
-    # print(model)
+    model_checkpoint = f'/shared/results/bartekk/reports_local/model_step_epoch_{phase1}.pth'    
+    model = prepare_model(type_names['model'], model_params=model_params, model_path=model_checkpoint).to(device)
+    print(model)
     
     
     # ════════════════════════ prepare loaders ════════════════════════ #
@@ -69,6 +66,7 @@ def objective(exp, epochs, lr, wd, N):
     loader_params = {'batch_size': 125, 'pin_memory': True, 'num_workers': 8}
     
     loaders = prepare_loaders_clp(type_names['dataset'], dataset_params=dataset_params, loader_params=loader_params)
+    loaders['train'].dataset.transform2 = transforms_fmnist.TRANSFORMS_NAME_MAP['transform_train_blurred'](32, 32, 1/4, OVERLAP)
     
     
     # ════════════════════════ prepare criterion ════════════════════════ #
@@ -103,8 +101,11 @@ def objective(exp, epochs, lr, wd, N):
     
     ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
-    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_lr_lambda_{LR_LAMBDA}_N_{N}'
-    EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase2'
+    
+    phase2 = 0
+    quick_name = f'intervention deactivation, trained with phase1={phase1} and phase2={phase2}'
+    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_N_{N}'
+    EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase3, {quick_name}'
 
     h_params_overall = {
         'model': model_params,
@@ -169,9 +170,9 @@ def objective(exp, epochs, lr, wd, N):
     }
     extra = {'window': 0,
              'overlap': OVERLAP,
-             'left_branch_intervention': None,
+             'left_branch_intervention': 'deactivation',
              'right_branch_intervention': None,
-             'enable_left_branch': True,
+             'enable_left_branch': False,
              'enable_right_branch': True
     }
     
@@ -183,7 +184,7 @@ def objective(exp, epochs, lr, wd, N):
     config.grad_accum_steps = GRAD_ACCUM_STEPS
     config.log_multi = 1#(T_max // epochs) // 10
     config.save_multi = 0#T_max // 10
-    # config.stiff_multi = (T_max // (window + epochs)) // 2
+    # config.stiff_multi = (T_max // epochs) // 2
     config.fim_trace_multi = (T_max // epochs) // 2
     config.run_stats_multi = (T_max // epochs) // 2
     
@@ -195,7 +196,6 @@ def objective(exp, epochs, lr, wd, N):
     config.exp_name = EXP_NAME
     config.extra = extra
     config.logger_config = logger_config
-    config.checkpoint_path = None
     
     
     # ════════════════════════ run ════════════════════════ #
@@ -207,6 +207,8 @@ def objective(exp, epochs, lr, wd, N):
         trainer.run_exp2(config)
     elif exp == 'deficit_reverse':
         trainer.run_exp1_reverse(config)
+    elif exp == 'intervention':
+        trainer.run_exp3(config)
     elif exp == 'just_run':
         trainer.run_exp4(config)
     else:
@@ -216,7 +218,7 @@ def objective(exp, epochs, lr, wd, N):
 if __name__ == "__main__":
     lr = float(sys.argv[1])
     wd = float(sys.argv[2])
-    N = int(sys.argv[3])
+    phase1 = int(sys.argv[3])
     print(lr, wd)
-    EPOCHS = 250
-    objective('just_run', EPOCHS, lr, wd, N)
+    EPOCHS = 200
+    objective('just_run', EPOCHS, lr, wd, phase1)
