@@ -165,7 +165,65 @@ class SimpleCNNwithNormandDropout(torch.nn.Module):
         x = x.flatten(start_dim=1)
         x = self.final_layer(x)
         return x
-    
+
+# class DualSimpleCNN(torch.nn.Module):
+#     def __init__(self, layers_dim: List[int], activation_name: str, conv_params: Dict[str, Any], wheter_concate: bool = False,
+#                  pre_mlp_depth: int = 1, eps: float = 1e-5, overlap: float = 0.0, num_features: int = 1):
+#         from math import ceil
+#         super().__init__()
+#         self.eps = eps
+#         self.scaling_factor = 2 if wheter_concate else 1
+        
+#         self.net1 = torch.nn.ModuleList([
+#             torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2))
+#             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
+#         ])
+#         self.net2 = torch.nn.ModuleList([
+#             torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2, bias=False),
+#                                 torch.nn.BatchNorm2d(layer_dim2))
+#             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
+#         ])
+        
+#         # x1 = torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
+#         x1 = torch.randn(1, 3, 32, ceil(32 * (overlap / 2 + 0.5))) if num_features == 3 else torch.randn(1, 1, 28, ceil(28 * (overlap / 2 + 0.5)))
+#         for block in self.net1:
+#             x1 = block(x1)
+#         _, self.channels_out, self.height, self.width = x1.shape
+#         pre_mlp_channels = self.channels_out * self.scaling_factor
+#         pre_mlp = [pre_mlp_channels for i in range(pre_mlp_depth + 1)]
+#         print(pre_mlp)
+#         flatten_dim = int(self.height * self.width * pre_mlp[-1])
+        
+#         self.net3 = torch.nn.ModuleList([
+#             torch.nn.Sequential(torch.nn.Conv2d(pre_mlp[i], pre_mlp[i+1], 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
+#                                 common.ACT_NAME_MAP[activation_name](),
+#                                 torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1, bias=False),
+#                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
+#                                 common.ACT_NAME_MAP[activation_name]()
+#                             )
+#             for i in range(pre_mlp_depth)
+#         ])
+#         self.final_layer = torch.nn.Sequential(torch.nn.Linear(flatten_dim, layers_dim[-2], bias=False),
+#                                                torch.nn.BatchNorm1d(layers_dim[-2]),
+#                                                common.ACT_NAME_MAP[activation_name](),
+#                                                torch.nn.Linear(layers_dim[-2], layers_dim[-1]))
     
 class DualSimpleCNN(torch.nn.Module):
     def __init__(self, layers_dim: List[int], activation_name: str, conv_params: Dict[str, Any], wheter_concate: bool = False,
