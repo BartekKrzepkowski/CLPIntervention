@@ -20,11 +20,12 @@ from src.modules.aux_modules import TraceFIM
 from src.modules.metrics import RunStatsBiModal
 
 
-def objective(exp, epochs, lr, wd, phase1):
+def objective(exp, epochs, lr, wd, phase1, phase2, phase3, model_checkpoint):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print('device', device)
     GRAD_ACCUM_STEPS = 1
     NUM_CLASSES = 10
     RANDOM_SEED = 83
@@ -54,7 +55,6 @@ def objective(exp, epochs, lr, wd, phase1):
     CONV_PARAMS = {'img_height': 32, 'img_widht': 32, 'kernels': [3, 3] * (N + 1), 'strides': [1, 1] * (N + 1), 'paddings': [1, 1] * (N + 1), 'whether_pooling': [False, True] * (N + 1)}
     model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'conv_params': CONV_PARAMS, 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
     
-    model_checkpoint = f'/home/barkrz/reports/deficit_reverse, sgd, dual_fmnist, mm_simple_cnn_fp_0.0_lr_0.1_wd_0.0_lr_lambda_1.0_N_3 overlap=0.0, phase1/2023-11-09_22-52-24/checkpoints/model_step_epoch_{phase1}.pth'    
     model = prepare_model(type_names['model'], model_params=model_params, model_path=model_checkpoint).to(device)
     print(model)
     
@@ -96,15 +96,16 @@ def objective(exp, epochs, lr, wd, phase1):
     optim, lr_scheduler = prepare_optim_and_scheduler(model, optim_name=type_names['optim'], optim_params=optim_params, scheduler_name=type_names['scheduler'], scheduler_params=scheduler_params)
     scheduler_params['lr_lambda'] = LR_LAMBDA # problem with omegacong with primitive type
     
+    
     # ════════════════════════ prepare wandb params ════════════════════════ #
     
+    
+
+    quick_name = f'trained with phase1={phase1} and phase2={phase2} and phase3={phase3}'
     ENTITY_NAME = 'gmum'
     PROJECT_NAME = 'Critical_Periods_Interventions'
-    
-    phase2 = 0
-    quick_name = f'intervention deactivation, trained with phase1={phase1} and phase2={phase2}'
-    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}_N_{N}'
-    EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase3, {quick_name}'
+    GROUP_NAME = f'{exp}, {type_names["optim"]}, {type_names["dataset"]}, {type_names["model"]}_fp_{FP}_lr_{LR}_wd_{WD}'
+    EXP_NAME = f'{GROUP_NAME} overlap={OVERLAP}, phase4, {quick_name}'
 
     h_params_overall = {
         'model': model_params,
@@ -169,9 +170,9 @@ def objective(exp, epochs, lr, wd, phase1):
     }
     extra = {'window': 0,
              'overlap': OVERLAP,
-             'left_branch_intervention': 'deactivation',
+             'left_branch_intervention': None,
              'right_branch_intervention': None,
-             'enable_left_branch': False,
+             'enable_left_branch': True,
              'enable_right_branch': True
     }
     
@@ -206,8 +207,6 @@ def objective(exp, epochs, lr, wd, phase1):
         trainer.run_exp2(config)
     elif exp == 'deficit_reverse':
         trainer.run_exp1_reverse(config)
-    elif exp == 'intervention':
-        trainer.run_exp3(config)
     elif exp == 'just_run':
         trainer.run_exp4(config)
     else:
@@ -218,6 +217,10 @@ if __name__ == "__main__":
     lr = float(sys.argv[1])
     wd = float(sys.argv[2])
     phase1 = int(sys.argv[3])
+    phase2 = int(sys.argv[4])
+    phase3 = int(sys.argv[5])
+    model_checkpoint = str(sys.argv[6])
     print(lr, wd)
-    EPOCHS = 200
-    objective('just_run', EPOCHS, lr, wd, phase1)
+    print(model_checkpoint)
+    EPOCHS = 280
+    objective('just_run', EPOCHS, lr, wd, phase1, phase2, phase3, model_checkpoint)
