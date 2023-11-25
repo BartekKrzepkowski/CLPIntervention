@@ -4,6 +4,7 @@ from torch import nn
 
 
 def default_init(m):
+    pass
     if isinstance(m, nn.Conv2d):
         nn.init.kaiming_normal_(m.weight, mode="fan_out")
         if m.bias is not None:
@@ -12,10 +13,18 @@ def default_init(m):
         nn.init.ones_(m.weight)
         nn.init.zeros_(m.bias)
     elif isinstance(m, nn.Linear):
-        init_range = 1.0 / sqrt(m.out_features)
-        nn.init.uniform_(m.weight, -init_range, init_range)
+        nn.init.kaiming_normal_(m.weight, mode="fan_out")
         if m.bias is not None:
             nn.init.zeros_(m.bias)
+    #     init_range = 1.0 / sqrt(m.out_features)
+    #     nn.init.uniform_(m.weight, -init_range, init_range)
+    #     if m.bias is not None:
+    #         nn.init.zeros_(m.bias)
+    
+# def default_init(model):
+#     for m in model.modules():
+#         if hasattr(m, 'reset_parameters'):
+#             m.reset_parameters()
             
 
 def count_parameters(model):

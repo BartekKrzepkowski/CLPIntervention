@@ -3,7 +3,7 @@ from math import ceil
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import Compose, ToTensor, Normalize, Resize, RandomAffine, RandomHorizontalFlip
     
-mean, std = (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.262)
+# mean, std = (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.262)
 
 transform_train_blurred = lambda h, w, resize_factor, overlap: Compose([
     ToTensor(),

@@ -7,14 +7,14 @@ from src.utils.utils_model import infer_dims_from_blocks
 
 
 class MMEffNetV2S(torch.nn.Module):
-    def __init__(self, num_classes=200, img_height=64, img_width=64, input_channels=3, overlap=0.0, eps=1e-5, wheter_concate=False):
+    def __init__(self, num_classes=200, dropout_rate=0.2, img_height=64, img_width=64, input_channels=3, overlap=0.0, eps=1e-5, wheter_concate=False):
         super(MMEffNetV2S, self).__init__()
         from math import ceil
         assert wheter_concate == False, "Concatenation is not supported yet"
         self.eps = eps
         self.scaling_factor = 2 if wheter_concate else 1
         
-        model = torchvision.models.efficientnet_v2_s(num_classes=num_classes)
+        model = torchvision.models.efficientnet_v2_s(num_classes=num_classes, dropout_rate=dropout_rate)
         
         # self.model.number_of_classes = num_classes
         # self.model.input_size = img_height

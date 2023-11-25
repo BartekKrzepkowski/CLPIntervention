@@ -36,9 +36,9 @@ def objective(exp_name, phase2, lr, wd):
     RANDOM_SEED = 83
     
     type_names = {
-        'model': 'mm_effnetv2s',
+        'model': 'mm_simple_cnn',
         'criterion': 'cls',
-        'dataset': 'mm_tinyimagenet',
+        'dataset': 'mm_fmnist',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -64,17 +64,12 @@ def objective(exp_name, phase2, lr, wd):
     
     # ════════════════════════ prepare model ════════════════════════ #
 
-
-    model_params = {
-        'num_classes': num_classes,
-        'dropout_rate': 0.1,
-        'img_height': 64,
-        'img_width': 64,
-        'input_channels': 3,
-        'overlap': 0.0,
-        'eps': 1e-5,
-        'wheter_concate': False
-    }
+    
+    N = 3
+    NUM_FEATURES = 1
+    DIMS = [NUM_FEATURES, 32] + [256] * N + [128, NUM_CLASSES]
+    
+    model_params = {'layers_dim': DIMS, 'activation_name': 'relu', 'overlap': OVERLAP, 'num_features': NUM_FEATURES, 'pre_mlp_depth': N}
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
     logging.info('Model prepared.')
@@ -137,7 +132,7 @@ def objective(exp_name, phase2, lr, wd):
     
     
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
     # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
     
     
