@@ -326,16 +326,3 @@ class TraceFIMB(torch.nn.Module):
         evaluators['steps/trace_fim'] = step
         self.logger.log_scalars(evaluators, step)       
 
-
-class RSV:
-    def __init__(self, held_out, model, logger):
-        self.held_out = held_out
-        self.model = model
-        self.logger = logger
-        self.device = next(model.parameters()).device
-        
-    def calc(self, step):
-        x_data = self.generate_data().to(self.device)
-        _ = self.model(x_data)
-        
-        

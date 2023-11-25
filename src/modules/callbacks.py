@@ -51,18 +51,16 @@ class RSVCallback:
         
     def __call__(self, module, input, output):
         if (isinstance(module, torch.nn.Linear) or isinstance(module, torch.nn.Conv2d)) and self.is_able: # czy moduł ma w sobie nazwę?
-            for i in range(output.size(0)//self.group_size):
+            for i in range(output.size(0) // self.group_size):
                 interval = self.group_size // 2
-                pack1 = output[i*self.group_size:i*self.group_size + interval]
-                pack2 = output[i*self.group_size + interval:(i+1)*self.group_size]
+                pack1 = output[i*self.group_size: i*self.group_size + interval]
+                pack2 = output[i*self.group_size + interval: (i+1)*self.group_size]
                 sv_a = pack1.var(dim=0)
                 sv_b = pack2.var(dim=0)
                 rsv = (sv_a - sv_b) / (sv_b + sv_a)
                 rsv = rsv.view(-1)
                 self.data[self.idx].append(rsv)
-            self.idx += 1
-                
-                
+            self.idx += 1        
             
     def reset(self):
         self.data = defaultdict(list)

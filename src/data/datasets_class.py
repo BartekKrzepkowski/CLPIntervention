@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
@@ -30,7 +32,7 @@ class SplitAndAugmentDataset(Dataset):
         self.with_overlap = overlap / 2 + 0.5
         self.is_train = is_train
         self.reverse = reverse
-        print('overlap:', overlap, 'with_overlap:', self.with_overlap)
+        logging.info(f'Overlap between visual fields: {overlap * 100} %, with a single visual field: {self.with_overlap * 100} % of the whole.')
 
     def __len__(self):
         return len(self.dataset)

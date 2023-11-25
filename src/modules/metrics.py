@@ -135,35 +135,26 @@ class RunStatsBiModal(torch.nn.Module):
         super().__init__()
         self.model_zero = deepcopy(model)
         self.last_model = deepcopy(model)
-        self.last_model_step = deepcopy(model)
         self.model = model
         self.optim = optim
-        self.model1_trajectory_length_group = {k: 0.0 for k, _ in self.model.named_parameters() if _.requires_grad and 'net1' in k}
-        self.model2_trajectory_length_group = {k: 0.0 for k, _ in self.model.named_parameters() if _.requires_grad and 'net2' in k}
-        self.model3_trajectory_length_group = {k: 0.0 for k, _ in self.model.named_parameters() if _.requires_grad and 'net3' in k}
-        self.model0_trajectory_length_overall = 0.0
-        self.model1_trajectory_length_overall = 0.0
-        self.model2_trajectory_length_overall = 0.0
-        self.model3_trajectory_length_overall = 0.0
+        self.left_branch_trajectory_length_group = {n: 0.0 for n, p in self.model.named_parameters() if p.requires_grad and 'left_branch' in n}
+        self.right_branch_trajectory_length_group = {n: 0.0 for n, p in self.model.named_parameters() if p.requires_grad and 'right_branch' in n}
+        self.main_branch_trajectory_length_group = {n: 0.0 for n, p in self.model.named_parameters() if p.requires_grad and 'main_branch' in n}
+        self.model_trajectory_length_overall = 0.0
+        self.left_branch_trajectory_length_overall = 0.0
+        self.right_branch_trajectory_length_overall = 0.0
+        self.main_branch_trajectory_length_overall = 0.0
         self.allowed_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
         
-    def forward(self, evaluators, distance_type, global_step):
-        # get checkpoints, ale zrób to najpierw w unimodalnym treningu
-        # self.last_model = deepcopy(self.model)
-        # if global_step % 1000 == 0:
-        #     self.last_model_step = deepcopy(self.model)
-            
+    def forward(self, evaluators, distance_type, global_step):          
         self.model.eval()
         # self.count_dead_neurons(evaluators)
         self.model_trajectory_length(evaluators)
         self.distance_between_models(self.model, self.model_zero, evaluators, distance_type, dist_label='distance_from initialization')
-        # self.distance_between_models(self.model, self.last_model, evaluators, distance_type, dist_label=)
-        # self.distance_between_models(self.model, self.last_model_step, evaluators, distance_type, dist_label=)
-        # evaluators['run_stats/model0_excessive_length_overall'] = evaluators['run_stats/model0_trajectory_length_overall'] - evaluators[f'run_stats/model0_distance_from_initialization_{distance_type}']
-        # evaluators['run_stats/model1_excessive_length_overall'] = evaluators['run_stats/model1_trajectory_length_overall'] - evaluators[f'run_stats/model1_distance_from_initialization_{distance_type}']
-        # evaluators['run_stats/model2_excessive_length_overall'] = evaluators['run_stats/model2_trajectory_length_overall'] - evaluators[f'run_stats/model2_distance_from_initialization_{distance_type}']
-        # evaluators['run_stats/model3_excessive_length_overall'] = evaluators['run_stats/model3_trajectory_length_overall'] - evaluators[f'run_stats/model3_distance_from_initialization_{distance_type}']
+        self.distance_between_models(self.model, self.last_model, evaluators, distance_type, dist_label='distance_from_last_checkpoint')
+        self.distance_between_branches(self.model, self.model, evaluators, distance_type, dist_label='distance_between_branches')
         self.model.train()
+        self.last_model = deepcopy(self.model)
         evaluators['steps/run_stats'] = global_step
         return evaluators
     
@@ -173,89 +164,88 @@ class RunStatsBiModal(torch.nn.Module):
         '''
         lr = self.optim.param_groups[-1]['lr']
         
-        named_parameters1 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'net1' in n]
+        named_parameters1 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'left_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
         for n, p in named_parameters1:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
-            evaluators[f'run_stats_model_weight_norm_squared/net1_{n}'] = weight_norm_per_layer.item() ** 2
+            evaluators[f'run_stats_model_weight_norm_squared/left_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
-            evaluators[f'run_stats_model_gradient_norm_squared/net1_{n}'] = grad_norm_per_layer.item() ** 2
-            evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/net1_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/net1_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/net1_{n}'])
+            evaluators[f'run_stats_model_gradient_norm_squared/left_branch_{n}'] = grad_norm_per_layer.item() ** 2
+            evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/left_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/left_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/left_branch_{n}'])
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
-            self.model1_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
-            evaluators[f'run_stats_model_trajectory_length_group/net1_{n}'] = self.model1_trajectory_length_group[n]
+            self.left_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
+            evaluators[f'run_stats_model_trajectory_length_group/left_branch_{n}'] = self.left_branch_trajectory_length_group[n]
             
         weight_norm1 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model1_weight_norm_squared_overall'] = weight_norm1 ** 2
+        evaluators[f'run_stats/left_branch_weight_norm_squared_overall'] = weight_norm1 ** 2
         grad_norm1 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model1_gradient_norm_squared_overall'] = grad_norm1 ** 2
-        evaluators[f'run_stats/model1_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model1_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model1_weight_norm_squared_overall'])
-        self.model1_trajectory_length_overall += lr * grad_norm1
-        evaluators['run_stats/model1_trajectory_length_overall'] = self.model1_trajectory_length_overall
+        evaluators[f'run_stats/left_branch_gradient_norm_squared_overall'] = grad_norm1 ** 2
+        evaluators[f'run_stats/left_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/left_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/left_branch_weight_norm_squared_overall'])
+        self.left_branch_trajectory_length_overall += lr * grad_norm1
+        evaluators['run_stats/left_branch_trajectory_length_overall'] = self.left_branch_trajectory_length_overall
         #-----------------------------------------------------------------------------------------------------------------
-        named_parameters2 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'net2' in n]
+        named_parameters2 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'right_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
         for n, p in named_parameters2:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
-            evaluators[f'run_stats_model_weight_norm_squared/net2_{n}'] = weight_norm_per_layer.item() ** 2
+            evaluators[f'run_stats_model_weight_norm_squared/right_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
-            evaluators[f'run_stats_model_gradient_norm_squared/net2_{n}'] = grad_norm_per_layer.item() ** 2
-            evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/net2_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/net2_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/net2_{n}'])
+            evaluators[f'run_stats_model_gradient_norm_squared/right_branch_{n}'] = grad_norm_per_layer.item() ** 2
+            # evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/right_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/right_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/right_branch_{n}'])
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
-            self.model2_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
-            evaluators[f'run_stats_model_trajectory_length_group/net2_{n}'] = self.model2_trajectory_length_group[n]
+            self.right_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
+            evaluators[f'run_stats_model_trajectory_length_group/right_branch_{n}'] = self.right_branch_trajectory_length_group[n]
             
         weight_norm2 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model2_weight_norm_squared_overall'] = weight_norm2 ** 2
+        evaluators[f'run_stats/right_branch_weight_norm_squared_overall'] = weight_norm2 ** 2
         grad_norm2 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model2_gradient_norm_squared_overall'] = grad_norm2 ** 2
-        evaluators[f'run_stats/model2_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model2_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model2_weight_norm_squared_overall'])
-        self.model2_trajectory_length_overall += lr * grad_norm2
-        evaluators['run_stats/model2_trajectory_length_overall'] = self.model2_trajectory_length_overall
+        evaluators[f'run_stats/right_branch_gradient_norm_squared_overall'] = grad_norm2 ** 2
+        # evaluators[f'run_stats/right_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/right_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/right_branch_weight_norm_squared_overall'])
+        self.right_branch_trajectory_length_overall += lr * grad_norm2
+        evaluators['run_stats/right_branch_trajectory_length_overall'] = self.right_branch_trajectory_length_overall
         #-----------------------------------------------------------------------------------------------------------------
-        named_parameters3 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'net3' in n]
+        named_parameters3 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'main_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
         for n, p in named_parameters3:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
-            evaluators[f'run_stats_model_weight_norm_squared/net3_{n}'] = weight_norm_per_layer.item() ** 2
+            evaluators[f'run_stats_model_weight_norm_squared/main_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
-            evaluators[f'run_stats_model_gradient_norm_squared/net3_{n}'] = grad_norm_per_layer.item() ** 2
-            evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/net3_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/net3_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/net3_{n}'])
+            evaluators[f'run_stats_model_gradient_norm_squared/main_branch_{n}'] = grad_norm_per_layer.item() ** 2
+            # evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/main_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/main_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/main_branch_{n}'])
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
-            self.model3_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
-            evaluators[f'run_stats_model_trajectory_length_group/net3_{n}'] = self.model3_trajectory_length_group[n]
+            self.main_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
+            evaluators[f'run_stats_model_trajectory_length_group/main_branch_{n}'] = self.main_branch_trajectory_length_group[n]
             
         weight_norm3 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model3_weight_norm_squared_overall'] = weight_norm3 ** 2
+        evaluators[f'run_stats/main_branch_weight_norm_squared_overall'] = weight_norm3 ** 2
         grad_norm3 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/model3_gradient_norm_squared_overall'] = grad_norm3 ** 2
-        evaluators[f'run_stats/model3_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model3_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model3_weight_norm_squared_overall'])
-        self.model3_trajectory_length_overall += lr * grad_norm3
-        evaluators['run_stats/model3_trajectory_length_overall'] = self.model3_trajectory_length_overall
+        evaluators[f'run_stats/main_branch_gradient_norm_squared_overall'] = grad_norm3 ** 2
+        # evaluators[f'run_stats/main_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/main_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/main_branch_weight_norm_squared_overall'])
+        self.main_branch_trajectory_length_overall += lr * grad_norm3
+        evaluators['run_stats/main_branch_trajectory_length_overall'] = self.main_branch_trajectory_length_overall
         #-----------------------------------------------------------------------------------------------------------------
-        
-        evaluators[f'run_stats/1_to_2_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm2 ** 2 + 1e-10)
-        evaluators[f'run_stats/1_to_3_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm3 ** 2 + 1e-10)
-        evaluators[f'run_stats/2_to_3_gradient_norm_squared_overall'] = grad_norm2 ** 2 / (grad_norm3 ** 2 + 1e-10)
+        evaluators[f'run_stats/left_to_right_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm2 ** 2 + 1e-9)
+        evaluators[f'run_stats/left_to_main_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm3 ** 2 + 1e-9)
+        evaluators[f'run_stats/right_to_main_gradient_norm_squared_overall'] = grad_norm2 ** 2 / (grad_norm3 ** 2 + 1e-9)
         weight_norm = torch.norm(torch.stack([torch.tensor(weight_norm1), torch.tensor(weight_norm2), torch.tensor(weight_norm3)]), norm_type).item()
-        evaluators[f'run_stats/model0_weight_norm_squared_overall'] = weight_norm ** 2
+        evaluators[f'run_stats/model_weight_norm_squared_overall'] = weight_norm ** 2
         grad_norm = torch.norm(torch.stack([torch.tensor(grad_norm1), torch.tensor(grad_norm2), torch.tensor(grad_norm3)]), norm_type).item()
-        evaluators[f'run_stats/model0_gradient_norm_squared_overall'] = grad_norm ** 2
-        evaluators[f'run_stats/model0_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model0_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model0_weight_norm_squared_overall'])
-        self.model0_trajectory_length_overall += lr * grad_norm
-        evaluators['run_stats/model0_trajectory_length_overall'] = self.model0_trajectory_length_overall
+        evaluators[f'run_stats/model_gradient_norm_squared_overall'] = grad_norm ** 2
+        # evaluators[f'run_stats/model_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model_weight_norm_squared_overall'])
+        self.model_trajectory_length_overall += lr * grad_norm
+        evaluators['run_stats/model_trajectory_length_overall'] = self.model_trajectory_length_overall
     
     def distance_between_models(self, model1, model2, evaluators, distance_type, dist_label):
-        def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, norm_type=2.0, net_nb=1):
+        def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, norm_type=2.0, branch_name=None):
             """
             Returns the l2 distance between two models.
             """
@@ -264,51 +254,81 @@ class RunStatsBiModal(torch.nn.Module):
                 dist = torch.norm(p1-p2, norm_type)
                 if n1 in self.allowed_parameter_names:
                     distances.append(dist)
-                evaluators[f'run_stats_{dist_label}_l2/net{net_nb}_{n1}'] = dist.item()
+                evaluators[f'run_stats_{dist_label}_l2/{branch_name}_{n1}'] = dist.item()
             distance = torch.norm(torch.stack(distances), norm_type)
-            evaluators[f'run_stats/model{net_nb}_{dist_label}_l2'] = distance.item()
+            evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] = distance.item()
         
-        def distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=1):
+        def distance_between_models_cosine(named_parameters1, named_parameters2, dist_label, branch_name):
             """
+            TODO
             Returns the cosine distance between two models.
             """
             distances = []
             for (n1, p1), (_, p2) in zip(named_parameters1, named_parameters2):
-                1 / 0
                 distance += 1 - torch.cosine_similarity(p1.flatten(), p2.flatten())
             return distance.item()
 
         """
         Returns the distance between two models.
         """
-        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'net1' in n]
-        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'net1' in n]
+        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'left_branch' in n]
+        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'left_branch' in n]
         if distance_type == 'l2':
-            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, net_nb=1)
+            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, branch_name='left_branch')
         elif distance_type == 'cosine':
-            distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=1)
+            pass
+            # distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=1)
         else:
             raise ValueError(f'Distance type {distance_type} not supported.')
         #-----------------------------------------------------------------------------------------------------------------
-        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'net2' in n]
-        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'net2' in n]
+        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'right_branch' in n]
+        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'right_branch' in n]
         if distance_type == 'l2':
-            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, net_nb=2)
+            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, branch_name='right_branch')
         elif distance_type == 'cosine':
-            distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=2)
+            pass
+            # distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=2)
         else:
             raise ValueError(f'Distance type {distance_type} not supported.')
         #-----------------------------------------------------------------------------------------------------------------
-        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'net3' in n]
-        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'net3' in n]
+        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'main_branch' in n]
+        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'main_branch' in n]
         if distance_type == 'l2':
-            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, net_nb=3)
+            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, branch_name='main_branch')
         elif distance_type == 'cosine':
-            distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=3)
+            pass
+            # distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=3)
         else:
             raise ValueError(f'Distance type {distance_type} not supported.')
         #-----------------------------------------------------------------------------------------------------------------
-        evaluators[f'run_stats/model0_{dist_label}_l2'] = sum([evaluators[f'run_stats/model{nb}_{dist_label}_l2'] for nb in range(1, 4)])
+        evaluators[f'run_stats/model_{dist_label}_l2'] = sum([evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] for branch_name in ['left_branch', 'right_branch', 'main_branch']])
+        
+    def distance_between_branches(self, model1, model2, evaluators, distance_type, dist_label):
+        def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, norm_type=2.0, branch_name=None):
+            """
+            Returns the l2 distance between two models.
+            """
+            distances = []
+            for (n1, p1), (n2, p2) in zip(named_parameters1, named_parameters2):
+                # print(f"The same names? {dist_label}:", '.'.join(n1.split('.')[1:]) == '.'.join(n2.split('.')[1:]))
+                dist = torch.norm(p1-p2, norm_type)
+                if n1 in self.allowed_parameter_names:
+                    distances.append(dist)
+                evaluators[f'run_stats_{dist_label}_l2/{branch_name}_{n1}'] = dist.item()
+            distance = torch.norm(torch.stack(distances), norm_type)
+            evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] = distance.item()
+        """
+        Returns the distance between two branches.
+        """
+        named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'left_branch' in n]
+        named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'right_branch' in n]
+        if distance_type == 'l2':
+            distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, branch_name='both_branches')
+        elif distance_type == 'cosine':
+            pass
+            # distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=2)
+        else:
+            raise ValueError(f'Distance type {distance_type} not supported.')
         
         
     def count_dead_neurons(self, evaluators):
