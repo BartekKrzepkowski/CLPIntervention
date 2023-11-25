@@ -12,13 +12,12 @@
 eval "$(conda shell.bash hook)"
 conda activate clpi_env
 
-PHASE1=0
-PHASE2=0
-for PHASE3 in 80 120 160 200
+
+for PHASE1 in 80 120 160 200
 do
-    CHECKPOINT="PATH_TO_CHECKPOINT/model_step_epoch_${PHASE3}.pth"
+    CHECKPOINT="/model_step_epoch_${PHASE1}.pth"
     echo $CHECKPOINT
-    WANDB__SERVICE_WAIT=300 CUDA_VISIBLE_DEVICES=0 python -m scripts.python_new.$1 1e-1 0.0 $PHASE1 $PHASE2 $PHASE3 "${CHECKPOINT}" &
+    WANDB__SERVICE_WAIT=300 CUDA_VISIBLE_DEVICES=0 python -m scripts.python_new.$1 1e-1 0.0 $PHASE1 "${CHECKPOINT}" &
 done
 
 wait
