@@ -4,6 +4,10 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
+def count_classes(dataset):
+    classes = [label for _, label in dataset]
+    return len(set(classes))
+
 #write a function to calculate mean and std of cifar10
 def get_mean_std(dataloader):
     mean = 0.
@@ -40,6 +44,7 @@ def get_mean_std_all(dataloader):
     return mean, std
 
 import numpy as np
+
 def get_mean_std_3(dataloader):
     mean = 0.0
     for images, _ in dataloader:
@@ -61,24 +66,3 @@ def get_mean_std_4(dataset):
     return train_mean, train_std
 
 
-from torchvision.transforms import Compose, Resize, ToTensor
-from torchvision.transforms import InterpolationMode
-transform_basic = Compose([ToTensor()])
-# # tensor([0.4909, 0.4816, 0.4459]) tensor([0.2162, 0.2135, 0.2342])
-# transform_blurred = Compose([ToTensor(), Resize(8, interpolation=InterpolationMode.BILINEAR, antialias=None), Resize(32, interpolation=InterpolationMode.BILINEAR, antialias=None)])
-dataset = datasets.CIFAR10(root=os.environ['CIFAR10_PATH'], train=True, download=True, transform=transform_basic)
-# dataloader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=2)
-# mean, std = get_mean_std_3(dataloader)
-# print(mean, std)
-
-
-
-x = np.stack([np.asarray(dataset[i][0]) for i in range(len(dataset))])
-# # print(x)
-# print(x.shape)`
-# # calculate the mean and std along the (0, 1) axes`
-train_mean = np.mean(x, axis=(0, 2, 3))
-train_std = np.std(x, axis=(0, 2, 3))
-# # the the mean and std
-print(train_mean, train_std)
-print(train_mean.shape, train_std.shape)

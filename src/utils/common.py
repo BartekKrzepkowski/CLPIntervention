@@ -1,39 +1,35 @@
 import torch
 
-from src.data.datasets import get_mnist, get_cifar10, get_cifar100, get_tinyimagenet, get_imagenet, get_cubbirds, get_food101,\
-    get_dual_mnist, get_dual_fmnist, get_dual_cifar10, get_dual_svhn, get_dual_kmnist
-from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss, BADGELoss
-from src.modules.architectures.models import MLP, MLPwithNorm, SimpleCNN, SimpleCNNwithNorm,\
-    SimpleCNNwithDropout, SimpleCNNwithNormandDropout, DualSimpleCNN
-from src.modules.architectures.resnets import ResNet18, ResNet34
-from src.modules.architectures.mm_resnets import build_mm_resnet
+from src.data.datasets import get_cubbirds, get_food101, get_tinyimagenet,\
+    get_mm_cifar10, get_mm_fmnist, get_mm_kmnist, get_mm_mnist, get_mm_svhn, get_mm_tinyimagenet
+from src.modules.architectures.mm_effnetv2 import MMEffNetV2S, ResNet18PyTorch
 from src.modules.architectures.mm_mlp import MMMLPwithNorm
-from src.utils.utils_optim import MultiStepwithDoubleLinearWarmup
+from src.modules.architectures.mm_resnets import build_mm_resnet
+from src.modules.architectures.models import MMSimpleCNN
+from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss
 from src.visualization.clearml_logger import ClearMLLogger
 from src.visualization.tensorboard_pytorch import TensorboardPyTorch
 from src.visualization.wandb_logger import WandbLogger
 
+
 ACT_NAME_MAP = {
-    'relu': torch.nn.ReLU,
     'gelu': torch.nn.GELU,
-    'tanh': torch.nn.Tanh,
+    'identity': torch.nn.Identity,
+    'relu': torch.nn.ReLU,
     'sigmoid': torch.nn.Sigmoid,
-    'identity': torch.nn.Identity
+    'tanh': torch.nn.Tanh,
 }
 
 DATASET_NAME_MAP = {
-    'mnist': get_mnist,
-    'cifar10': get_cifar10,
-    'cifar100': get_cifar100,
-    'tinyimagenet': get_tinyimagenet,
-    'imagenet': get_imagenet,
     'cubbirds': get_cubbirds,
     'food101': get_food101,
-    'dual_mnist': get_dual_mnist,
-    'dual_fmnist': get_dual_fmnist,
-    'dual_kmnist': get_dual_kmnist,
-    'dual_svhn': get_dual_svhn,
-    'dual_cifar10': get_dual_cifar10,
+    'tinyimagenet': get_tinyimagenet,
+    'mm_cifar10': get_mm_cifar10,
+    'mm_fmnist': get_mm_fmnist,
+    'mm_kmnist': get_mm_kmnist,
+    'mm_mnist': get_mm_mnist,
+    'mm_svhn': get_mm_svhn,
+    'mm_tinyimagenet': get_mm_tinyimagenet,
 }
 
 LOGGERS_NAME_MAP = {
@@ -45,46 +41,38 @@ LOGGERS_NAME_MAP = {
 LOSS_NAME_MAP = {
     'ce': torch.nn.CrossEntropyLoss,
     'cls': ClassificationLoss,
+    'fp': FisherPenaltyLoss,
     'nll': torch.nn.NLLLoss,
     'mse': torch.nn.MSELoss,
     'mse_softmax': MSESoftmaxLoss,
-    'fp': FisherPenaltyLoss,
-    'badge': BADGELoss,
 }
 
 MODEL_NAME_MAP = {
-    'mlp': MLP,
-    'mlp_with_norm': MLPwithNorm,
-    'simple_cnn': SimpleCNN,
-    'simple_cnn_with_norm': SimpleCNNwithNorm,
-    'simple_cnn_with_dropout': SimpleCNNwithDropout,
-    'simple_cnn_with_norm_and_dropout': SimpleCNNwithNormandDropout,
-    'resnet18': ResNet18,
-    'resnet34': ResNet34,
     'mm_mlp_bn': MMMLPwithNorm,
-    'mm_simple_cnn': DualSimpleCNN,
-    'mm_resnet': build_mm_resnet
+    'mm_simple_cnn': MMSimpleCNN,
+    'mm_resnet': build_mm_resnet,
+    'mm_effnetv2s': MMEffNetV2S,
+    'mm_resnet18': ResNet18PyTorch,
 }
 
 NORM_LAYER_NAME_MAP = {
     'bn1d': torch.nn.BatchNorm1d,
     'bn2d': torch.nn.BatchNorm2d,
-    'layer_norm': torch.nn.LayerNorm,
     'group_norm': torch.nn.GroupNorm,
     'instance_norm_1d': torch.nn.InstanceNorm1d,
     'instance_norm_2d': torch.nn.InstanceNorm2d,
+    'layer_norm': torch.nn.LayerNorm,
 }
 
 OPTIMIZER_NAME_MAP = {
-    'sgd': torch.optim.SGD,
     'adam': torch.optim.Adam,
     'adamw': torch.optim.AdamW,
+    'sgd': torch.optim.SGD,
 }
 
 SCHEDULER_NAME_MAP = {
-    'reduce_on_plateau': torch.optim.lr_scheduler.ReduceLROnPlateau,
-    'multiplicative': torch.optim.lr_scheduler.MultiplicativeLR,
     'cosine': torch.optim.lr_scheduler.CosineAnnealingLR,
     'cosine_warm_restarts': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
-    'multistep_with_double_linear_warmup': MultiStepwithDoubleLinearWarmup,
+    'multiplicative': torch.optim.lr_scheduler.MultiplicativeLR,
+    'reduce_on_plateau': torch.optim.lr_scheduler.ReduceLROnPlateau,
 }

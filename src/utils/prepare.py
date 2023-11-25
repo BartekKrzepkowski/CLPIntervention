@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 
 from src.utils.common import DATASET_NAME_MAP, LOSS_NAME_MAP, MODEL_NAME_MAP, OPTIMIZER_NAME_MAP, SCHEDULER_NAME_MAP
-from src.utils.utils_model import init_with_kaiming_normal_fan_in, init_with_kaiming_normal_fan_out
+from src.utils.utils_model import default_init
 from src.utils.utils_optim import configure_optimizer
 from src.utils.utils_trainer import load_model
 
@@ -10,10 +10,8 @@ def prepare_model(model_name, model_params, model_path=None, init=None):
     model = MODEL_NAME_MAP[model_name](**model_params)
     if model_path is not None:
         model = load_model(model, model_path)
-    elif init == 'kaiming_in':
-        model.apply(init_with_kaiming_normal_fan_in)
-    elif init == 'kaiming_out':
-        model.apply(init_with_kaiming_normal_fan_out)
+    else:
+        model.apply(default_init)
     return model
 
 
@@ -26,7 +24,6 @@ def prepare_loaders(dataset_name, dataset_params, loader_params):
         'test': test_loader
     }
     return loaders
-
 
 
 def prepare_loaders_clp(dataset_name, dataset_params, loader_params):

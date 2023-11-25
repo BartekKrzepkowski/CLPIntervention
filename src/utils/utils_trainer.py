@@ -25,17 +25,32 @@ def manual_seed(random_seed, device):
 
 def adjust_evaluators(d1, dd2, denom, scope, phase):
     for evaluator_key in dd2:
-        eval_key = str(evaluator_key).split('/')
-        if 'train' in evaluator_key or 'valid' in evaluator_key or 'test' in evaluator_key:
-            eval_key = '/'.join(eval_key[:-1]).split('_')
-            eval_key = '_'.join(eval_key[1:]) if eval_key[0] in {'running', 'epoch'} else '_'.join(eval_key)
-            d1[f'{scope}_{eval_key}/{phase}'] += dd2[evaluator_key] * denom
-        elif len(eval_key) == 1:
-            d1[f'{scope}_{eval_key[0]}/{phase}'] += dd2[evaluator_key] * denom
+        eval_key_split_1 = str(evaluator_key).split('/')
+        if len(eval_key_split_1) == 1:
+            d1[f'{scope}_{eval_key_split_1[0]}/{phase}'] += dd2[evaluator_key] * denom
         else:
-            eval_key = '/'.join(eval_key).split('_')
-            eval_key = '_'.join(eval_key[1:]) if eval_key[0] in {'running', 'epoch'} else '_'.join(eval_key)
-            d1[f'{scope}_{eval_key}'] += dd2[evaluator_key] * denom
+            if '____' not in eval_key_split_1[1]:
+                eval_key_split_1[1] += f'____{phase}'
+
+            eval_key_split_2 = eval_key_split_1[0].split('_')
+            if eval_key_split_2[0] in {'running', 'epoch'}:
+                eval_key_split_2 = [scope] + eval_key_split_2[1:]
+            else:
+                eval_key_split_2 = [scope] + eval_key_split_2
+            eval_key_split_1[0] = '_'.join(eval_key_split_2)
+            d1['/'.join(eval_key_split_1)] += dd2[evaluator_key] * denom
+        
+        # eval_key = str(evaluator_key).split('/')
+        # if 'train' in evaluator_key or 'valid' in evaluator_key or 'test' in evaluator_key:
+        #     eval_key = '/'.join(eval_key[:-1]).split('_')
+        #     eval_key = '_'.join(eval_key[1:]) if eval_key[0] in {'running', 'epoch'} else '_'.join(eval_key)
+        #     d1[f'{scope}_{eval_key}/{phase}'] += dd2[evaluator_key] * denom
+        # elif len(eval_key) == 1:
+        #     d1[f'{scope}_{eval_key[0]}/{phase}'] += dd2[evaluator_key] * denom
+        # else:
+        #     eval_key = '/'.join(eval_key).split('_')
+        #     eval_key = '_'.join(eval_key[1:]) if eval_key[0] in {'running', 'epoch'} else '_'.join(eval_key)
+        #     d1[f'{scope}_{eval_key}'] += dd2[evaluator_key] * denom
     return d1
 
 
@@ -77,12 +92,5 @@ def create_paths(base_path, exp_name):
     os.makedirs(save_path_base)
     save_path = lambda step: f'{save_path_base}/model_step_{step}.pth'
     return base_path, save_path
-
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
-
 
 
