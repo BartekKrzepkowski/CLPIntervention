@@ -1,0 +1,9 @@
+{
+    "backbone_type": "resnet18",
+    "batchnorm_layers": true,
+    "modify_resnet": true,
+    "only_features": false,
+    "skips": true,
+    "wheter_concate": false,
+    "width_scale": 1.0
+}

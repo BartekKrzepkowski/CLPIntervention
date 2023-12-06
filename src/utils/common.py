@@ -2,7 +2,7 @@ import torch
 
 from src.data.datasets import get_cubbirds, get_food101, get_tinyimagenet,\
     get_mm_cifar10, get_mm_fmnist, get_mm_kmnist, get_mm_mnist, get_mm_svhn, get_mm_tinyimagenet
-from src.modules.architectures.mm_effnetv2 import MMEffNetV2S, ResNet18PyTorch
+from src.modules.architectures.mm_effnetv2 import MMEffNetV2S, ResNet18PyTorch, MMConvNext
 from src.modules.architectures.mm_mlp import MMMLPwithNorm
 from src.modules.architectures.mm_resnets import build_mm_resnet
 from src.modules.architectures.models import MMSimpleCNN
@@ -53,6 +53,7 @@ MODEL_NAME_MAP = {
     'mm_resnet': build_mm_resnet,
     'mm_effnetv2s': MMEffNetV2S,
     'mm_resnet18': ResNet18PyTorch,
+    'mm_convnext': MMConvNext,
 }
 
 NORM_LAYER_NAME_MAP = {

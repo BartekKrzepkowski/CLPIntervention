@@ -1,11 +1,14 @@
-import torch
 import os
+
+import numpy as np
+import torch
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
+
 def count_classes(dataset):
-    classes = [label for _, label in dataset]
+    classes = len(np.unique(np.array(dataset.targets)))
     return len(set(classes))
 
 #write a function to calculate mean and std of cifar10

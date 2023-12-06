@@ -98,7 +98,7 @@ class ResNet(nn.Module):
         self.scale_width = width_scale
         self.skips = skips
 
-        
+
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -111,17 +111,15 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
-        
+
         self.inplanes = int(64 * width_scale)
-        
         self.conv11 = torch.nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=2, bias=False) if modify_resnet else \
             nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.maxpool1 = torch.nn.Identity() if modify_resnet else nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
         self.conv21 = torch.nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=2, bias=False) if modify_resnet else \
             nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.maxpool2 = torch.nn.Identity() if modify_resnet else nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
+
         self.left_branch = nn.Sequential(self.conv11,
                                   norm_layer(self.inplanes),
                                   nn.ReLU(inplace=True),
@@ -135,8 +133,10 @@ class ResNet(nn.Module):
                                   self.maxpool2,
                                   self._make_layer(block, 64, layers[0]),
                                   self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]))
-        
+
         z = torch.randn(1, 3, img_height, ceil(img_width * (overlap / 2 + 0.5)))
+        # z = self.left_branch(z)
+        # _, self.channels_out, self.height, self.width = z.shape
         self.channels_out, self.height, self.width, pre_mlp_channels = infer_dims_from_blocks(self.left_branch, z, scaling_factor=self.scaling_factor)
         self.main_branch = nn.Sequential(self._make_layer(block, 256 * self.scaling_factor, layers[2], stride=2, dilate=replace_stride_with_dilation[1]),
                                   self._make_layer(block, 512 * self.scaling_factor, layers[3], stride=2, dilate=replace_stride_with_dilation[2]))
@@ -212,18 +212,17 @@ class ResNet(nn.Module):
             )
 
         return nn.Sequential(*layers)
-    
 
     def forward(self, x1, x2, left_branch_intervention=None, right_branch_intervention=None, enable_left_branch=True, enable_right_branch=True):
         assert left_branch_intervention is None or right_branch_intervention is None, "At least one branchnet should be left intact"
         assert enable_left_branch or enable_right_branch, "At least one branchnet should be enabled"
-        
+
         if enable_left_branch:
             if left_branch_intervention == "occlusion":
                 x1 = torch.randn_like(x1, device=x1.device) * self.eps
             elif left_branch_intervention == "deactivation":
                 x1 = torch.zeros_like(x1, device=x1.device)
-                
+
             x1 = self.left_branch(x1)
         else:
             if left_branch_intervention == "occlusion":
@@ -232,13 +231,13 @@ class ResNet(nn.Module):
                 x1 = torch.zeros((x1.size(0), self.channels_out, self.height, self.width), device=x1.device)
             else:
                 raise ValueError("Invalid left branch intervention")
-        
+    
         if enable_right_branch:
             if right_branch_intervention == "occlusion":
                 x2 = torch.randn_like(x2, device=x2.device) * self.eps
             elif right_branch_intervention == "deactivation":
                 x2 = torch.zeros_like(x2, device=x2.device)
-                
+
             x2 = self.right_branch(x2)
         else:
             if right_branch_intervention == "occlusion":
@@ -247,7 +246,7 @@ class ResNet(nn.Module):
                 x2 = torch.zeros((x2.size(0), self.channels_out, self.height, self.width), device=x2.device)
             else:
                 raise ValueError("Invalid right branch intervention")
-            
+
         y = torch.cat((x1, x2), dim=-1) if self.scaling_factor == 2 else x1 + x2
         y = self.main_branch(y)
         y = self.avgpool(y)
@@ -266,10 +265,7 @@ def build_mm_resnet(model_config, num_classes, dataset_name):
     modify_resnet = model_config['modify_resnet']
     wheter_concate = model_config['wheter_concate']
     overlap = model_config['overlap']
-    
-    modify_resnet = modify_resnet and (dataset_name == "dual_cifar100" or dataset_name == "dual_cifar10")
 
-    # model = torchvision.models.__dict__[backbone_type](num_classes=num_classes)
     resnet = partial(
         ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate
     )
@@ -289,15 +285,6 @@ def build_mm_resnet(model_config, num_classes, dataset_name):
         case _:
             raise ValueError(f"Unknown backbone type: {backbone_type}")
 
-    # if modify_resnet and (dataset_name == "cifar100" or dataset_name == "cifar10"):
-    #     model.maxpool1 = torch.nn.Identity()
-    #     model.conv11 = torch.nn.Conv2d(
-    #         3, int(64 * width_scale), kernel_size=3, stride=1, padding=2, bias=False
-    #     )
-    #     model.maxpool2 = torch.nn.Identity()
-    #     model.conv21 = torch.nn.Conv2d(
-    #         3, int(64 * width_scale), kernel_size=3, stride=1, padding=2, bias=False
-    #     )
     if only_features:
         model.fc = torch.nn.Identity()
 
@@ -320,24 +307,6 @@ def build_mm_resnet(model_config, num_classes, dataset_name):
     model.penultimate_layer_size = renset_penultimate_layer_size[backbone_type]
 
     return model
-
-
-def _forward_impl(self, x: Tensor) -> Tensor:
-    # See note [TorchScript super()]
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-
-    x = self.avgpool(x)
-    x = torch.flatten(x, 1)
-
-    return x
 
 
 if __name__ == "__main__":

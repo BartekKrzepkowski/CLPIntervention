@@ -21,7 +21,7 @@ from src.utils.utils_data import count_classes
 from src.utils.utils_trainer import manual_seed
 
 
-def objective(exp_name, phase2, lr, wd):
+def objective(exp_name, phase2, lr, wd, dropout, stochastic_depth_prob):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -31,7 +31,7 @@ def objective(exp_name, phase2, lr, wd):
     CLIP_VALUE = 0.0
     LOGS_PER_EPOCH = 0  # 0 means every batch
     LR_LAMBDA = 1.0
-    NUM_WORKERS = 10
+    NUM_WORKERS = 16
     OVERLAP = 0.0
     RANDOM_SEED = 83
     
@@ -65,13 +65,15 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare model ════════════════════════ #
 
 
+    input_channels, img_height, img_width = loaders['train'].dataset[0][0][0].shape
     model_params = {
         'num_classes': num_classes,
-        'dropout_rate': 0.1,
-        'img_height': 64,
-        'img_width': 64,
-        'input_channels': 3,
-        'overlap': 0.0,
+        'dropout': dropout,
+        'stochastic_depth_prob': stochastic_depth_prob,
+        'input_channels': input_channels,
+        'img_height': img_height,
+        'img_width': img_width,
+        'overlap': OVERLAP,
         'eps': 1e-5,
         'wheter_concate': False
     }
@@ -110,7 +112,7 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare wandb params ════════════════════════ #
 
 
-    GROUP_NAME = f'{type_names["model"]}, {type_names["dataset"]}, {type_names["optim"]}, overlap={OVERLAP}_epochs={phase2}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}'
+    GROUP_NAME = f'{type_names["dataset"]}, {type_names["model"]}, {type_names["optim"]}, epochs={phase2}_overlap={OVERLAP}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}_dropout={dropout}_stochastic_depth_prob={stochastic_depth_prob}'
     EXP_NAME = f'{exp_name}, {GROUP_NAME}'
 
     h_params_overall = {
@@ -137,7 +139,7 @@ def objective(exp_name, phase2, lr, wd):
     
     
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
     # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
     
     
@@ -213,6 +215,8 @@ if __name__ == "__main__":
     phase2 = int(sys.argv[1])
     lr = float(sys.argv[2])
     wd = float(sys.argv[3])
+    dropout = float(sys.argv[4])
+    stochastic_depth_prob = float(sys.argv[5])
     
     logging.basicConfig(
             format=(
@@ -222,6 +226,6 @@ if __name__ == "__main__":
             handlers=[logging.StreamHandler()],
             force=True,
         )
-    logging.info(f'Script started with phase2={phase2}, lr={lr}, wd={wd}')
+    logging.info(f'Script started with phase2={phase2}, lr={lr}, wd={wd}.')
     
-    objective('phase2', phase2, lr, wd)
+    objective('phase2', phase2, lr, wd, dropout, stochastic_depth_prob)

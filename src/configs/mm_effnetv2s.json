@@ -1,0 +1,6 @@
+{
+    "dropout": 0.05,
+    "eps": 1e-5,
+    "stochastic_depth_prob": 0.05,
+    "wheter_concate": false
+}

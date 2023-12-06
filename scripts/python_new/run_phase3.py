@@ -5,9 +5,8 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-import omegaconf
 import torch
-from math import ceil
+from omegaconf import OmegaConf
 
 # from rich.traceback import install
 # install(show_locals=True)
@@ -18,10 +17,11 @@ from src.trainer.trainer_classification_mm_clp import TrainerClassification
 from src.utils.prepare import prepare_criterion, prepare_loaders_clp, prepare_model, prepare_optim_and_scheduler
 from src.utils.utils_criterion import get_samples_weights
 from src.utils.utils_data import count_classes
+from src.utils.utils_model import load_model_specific_params
 from src.utils.utils_trainer import manual_seed
 
 
-def objective(exp_name, phase2, lr, wd):
+def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3, model_checkpoint):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -31,14 +31,14 @@ def objective(exp_name, phase2, lr, wd):
     CLIP_VALUE = 0.0
     LOGS_PER_EPOCH = 0  # 0 means every batch
     LR_LAMBDA = 1.0
-    NUM_WORKERS = 10
+    NUM_WORKERS = 12
     OVERLAP = 0.0
     RANDOM_SEED = 83
     
     type_names = {
-        'model': 'mm_resnet',
+        'model': model_name,
         'criterion': 'cls',
-        'dataset': 'mm_cifar10',
+        'dataset': dataset_name,
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -65,17 +65,18 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare model ════════════════════════ #
 
 
-    model_config = {'backbone_type': 'resnet18',
-                    'only_features': False,
-                    'batchnorm_layers': True,
-                    'width_scale': 1.0,
-                    'skips': True,
-                    'modify_resnet': True,
-                    'wheter_concate': False,
-                    'overlap': OVERLAP,}
-    model_params = {'model_config': model_config, 'num_classes': num_classes, 'dataset_name': type_names['dataset']}
+    input_channels, img_height, img_width = loaders['train'].dataset[0][0][0].shape
+    model_params = load_model_specific_params(type_names["model"])
+    model_params = {
+        'num_classes': num_classes,
+        'input_channels': input_channels,
+        'img_height': img_height,
+        'img_width': img_width,
+        'overlap': OVERLAP,
+        **model_params
+    }
     
-    model = prepare_model(type_names['model'], model_params=model_params).to(device)
+    model = prepare_model(type_names['model'], model_params=model_params, model_path=model_checkpoint).to(device)
     logging.info('Model prepared.')
     
     
@@ -95,7 +96,7 @@ def objective(exp_name, phase2, lr, wd):
     
 
     batches_per_epoch = len(loaders["train"])
-    T_max = batches_per_epoch * phase2
+    T_max = batches_per_epoch * phase3
     
     optim_params = {'lr': lr, 'weight_decay': wd}
     scheduler_params = {'lr_lambda': lambda epoch: LR_LAMBDA}
@@ -109,8 +110,9 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare wandb params ════════════════════════ #
 
 
-    GROUP_NAME = f'{type_names["model"]}, {type_names["dataset"]}, {type_names["optim"]}, overlap={OVERLAP}_epochs={phase2}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}'
-    EXP_NAME = f'{exp_name}, {GROUP_NAME}'
+    quick_name = f'intervention deactivation, trained with phase1={phase1} and phase2={phase2}'
+    GROUP_NAME = f'{type_names["dataset"]}, {type_names["model"]}, {type_names["optim"]}, epochs={phase3}_overlap={OVERLAP}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}'
+    EXP_NAME = f'{exp_name}, {quick_name}, {GROUP_NAME}'
 
     h_params_overall = {
         'model': model_params,
@@ -167,10 +169,10 @@ def objective(exp_name, phase2, lr, wd):
                      'mode': 'online',
     }
 
-    config = omegaconf.OmegaConf.create()
+    config = OmegaConf.create()
     
-    config.exp_starts_at_epoch = 0
-    config.exp_ends_at_epoch = phase2
+    config.exp_starts_at_epoch = phase1 + phase2
+    config.exp_ends_at_epoch = phase3 + config.exp_starts_at_epoch
     
     config.log_multi = batches_per_epoch // (LOGS_PER_EPOCH if LOGS_PER_EPOCH != 0 else batches_per_epoch)
     config.run_stats_multi = batches_per_epoch // 2
@@ -192,7 +194,8 @@ def objective(exp_name, phase2, lr, wd):
     
     
     logging.info(f'The built model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable parameters and {sum(p.numel() for p in model.parameters() if not p.requires_grad)} non trainable parameters.')
-    logging.info(f'The dataset has {len(loaders["train"].dataset)} train samples and {len(loaders["test_proper"].dataset)} test samples and {num_classes} classes and every epoch has {batches_per_epoch} batches.')
+    logging.info(f'The dataset has {len(loaders["train"].dataset)} train samples, {len(loaders["test_proper"].dataset)} test samples, {num_classes} classes,\
+        each image has a dimension of {input_channels}x{img_height}x{img_width} and each epoch has {batches_per_epoch} batches.')
     
     if exp_name == 'phase1':
         trainer.run_phase1(config)
@@ -209,9 +212,7 @@ def objective(exp_name, phase2, lr, wd):
 
 
 if __name__ == "__main__":
-    phase2 = int(sys.argv[1])
-    lr = float(sys.argv[2])
-    wd = float(sys.argv[3])
+    conf = OmegaConf.from_cli()
     
     logging.basicConfig(
             format=(
@@ -221,6 +222,6 @@ if __name__ == "__main__":
             handlers=[logging.StreamHandler()],
             force=True,
         )
-    logging.info(f'Script started with phase2={phase2}, lr={lr}, wd={wd}')
+    logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={phase1}, phase2={conf.phase2} phase3={conf.phase3}.')
     
-    objective('phase2', phase2, lr, wd)
+    objective('phase3', conf.model_name, conf.dataset_name, conf.lr, conf.wd, conf.phase1, conf.phase2, conf.phase3, conf.model_checkpoint)

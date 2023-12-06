@@ -53,7 +53,7 @@ def objective(exp_name, lr, wd, phase1, phase2, phase3, phase4):
     # ════════════════════════ prepare loaders ════════════════════════ #
     
     
-    dataset_params = {'dataset_path': None, 'overlap': OVERLAP}
+    dataset_params = {'overlap': OVERLAP}
     loader_params = {'batch_size': BATCH_SIZE, 'pin_memory': True, 'num_workers': NUM_WORKERS}
     
     loaders = prepare_loaders_clp(type_names['dataset'], dataset_params=dataset_params, loader_params=loader_params)

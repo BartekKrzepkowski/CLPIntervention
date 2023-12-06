@@ -21,7 +21,7 @@ from src.utils.utils_data import count_classes
 from src.utils.utils_trainer import manual_seed
 
 
-def objective(exp_name, phase2, lr, wd):
+def objective(exp_name, phase2, lr, wd, stochastic_depth_prob):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -36,9 +36,9 @@ def objective(exp_name, phase2, lr, wd):
     RANDOM_SEED = 83
     
     type_names = {
-        'model': 'mm_resnet',
+        'model': 'mm_convnext',
         'criterion': 'cls',
-        'dataset': 'mm_cifar10',
+        'dataset': 'mm_tinyimagenet',
         'optim': 'sgd',
         'scheduler': 'multiplicative'
     }
@@ -65,15 +65,17 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare model ════════════════════════ #
 
 
-    model_config = {'backbone_type': 'resnet18',
-                    'only_features': False,
-                    'batchnorm_layers': True,
-                    'width_scale': 1.0,
-                    'skips': True,
-                    'modify_resnet': True,
-                    'wheter_concate': False,
-                    'overlap': OVERLAP,}
-    model_params = {'model_config': model_config, 'num_classes': num_classes, 'dataset_name': type_names['dataset']}
+    input_channels, img_height, img_width = loaders['train'].dataset[0][0][0].shape
+    model_params = {
+        'num_classes': num_classes,
+        'stochastic_depth_prob': stochastic_depth_prob,
+        'input_channels': input_channels,
+        'img_height': img_height,
+        'img_width': img_width,
+        'overlap': OVERLAP,
+        'eps': 1e-5,
+        'wheter_concate': False
+    }
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
     logging.info('Model prepared.')
@@ -109,7 +111,7 @@ def objective(exp_name, phase2, lr, wd):
     # ════════════════════════ prepare wandb params ════════════════════════ #
 
 
-    GROUP_NAME = f'{type_names["model"]}, {type_names["dataset"]}, {type_names["optim"]}, overlap={OVERLAP}_epochs={phase2}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}'
+    GROUP_NAME = f'{type_names["model"]}, {type_names["dataset"]}, {type_names["optim"]}, overlap={OVERLAP}_epochs={phase2}_lr={lr}_wd={wd}_lambda={LR_LAMBDA}_stochastic_depth_prob={stochastic_depth_prob}'
     EXP_NAME = f'{exp_name}, {GROUP_NAME}'
 
     h_params_overall = {
@@ -136,7 +138,7 @@ def objective(exp_name, phase2, lr, wd):
     
     
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
     # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
     
     
@@ -212,6 +214,7 @@ if __name__ == "__main__":
     phase2 = int(sys.argv[1])
     lr = float(sys.argv[2])
     wd = float(sys.argv[3])
+    stochastic_depth_prob = float(sys.argv[4])
     
     logging.basicConfig(
             format=(
@@ -221,6 +224,6 @@ if __name__ == "__main__":
             handlers=[logging.StreamHandler()],
             force=True,
         )
-    logging.info(f'Script started with phase2={phase2}, lr={lr}, wd={wd}')
+    logging.info(f'Script started with phase2={phase2}, lr={lr}, wd={wd}.')
     
-    objective('phase2', phase2, lr, wd)
+    objective('phase2', phase2, lr, wd, stochastic_depth_prob)

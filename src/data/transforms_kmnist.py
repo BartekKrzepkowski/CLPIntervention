@@ -7,25 +7,25 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Resize, RandomA
 # mean, std = (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.262)
 
 transform_train_blurred = lambda h, w, resize_factor, overlap: Compose([
-    ToTensor(),
     Resize((ceil(resize_factor * h), ceil(resize_factor * ceil((overlap / 2 + 0.5) * w))), interpolation=InterpolationMode.BILINEAR, antialias=None),
     Resize((h, ceil((overlap / 2 + 0.5) * w)), interpolation=InterpolationMode.BILINEAR, antialias=None),
     transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
     transforms.ColorJitter(brightness=0.2, contrast=0.2),
+    ToTensor(),
     Normalize(*OVERLAP_TO_NORMALIZATION_MAP_BLURRED_R[overlap])
 ])
 
 transform_train_proper = lambda overlap, side: Compose([
-    ToTensor(),
     transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
     transforms.ColorJitter(brightness=0.2, contrast=0.2),
+    ToTensor(),
     Normalize(*SIDE_MAP_PROPER[side][overlap])
 ])
 
 transform_eval_blurred = lambda h, w, resize_factor, overlap: Compose([
-    ToTensor(),
     Resize((ceil(resize_factor * h), ceil(resize_factor * ceil((overlap / 2 + 0.5) * w))), interpolation=InterpolationMode.BILINEAR, antialias=None),
     Resize((h, ceil((overlap / 2 + 0.5) * w)), interpolation=InterpolationMode.BILINEAR, antialias=None),
+    ToTensor(),
     Normalize(*OVERLAP_TO_NORMALIZATION_MAP_BLURRED_R[overlap])
 ])
 
