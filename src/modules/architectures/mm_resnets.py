@@ -255,16 +255,7 @@ class ResNet(nn.Module):
         return y
 
 
-def build_mm_resnet(model_config, num_classes, dataset_name):
-
-    backbone_type = model_config['backbone_type']
-    only_features = model_config['only_features']
-    batchnorm_layers = model_config['batchnorm_layers']
-    width_scale = model_config['width_scale']
-    skips = model_config['skips']
-    modify_resnet = model_config['modify_resnet']
-    wheter_concate = model_config['wheter_concate']
-    overlap = model_config['overlap']
+def build_mm_resnet(num_classes, input_channels, img_height, img_width, overlap, backbone_type, batchnorm_layers, modify_resnet, only_features, skips, wheter_concate, width_scale):
 
     resnet = partial(
         ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate

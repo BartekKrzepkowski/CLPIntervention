@@ -25,7 +25,7 @@ class TrainerClassification:
         self.logger = None
         self.base_path = None
         self.save_path = None
-        self.epoch = None
+        self.epoch = -1
         self.global_step = None
 
         self.extra_modules = extra_modules
@@ -228,6 +228,8 @@ class TrainerClassification:
             self.extra_modules['tunnel'].logger = self.logger
         if 'trace_fim' in self.extra_modules:
             self.extra_modules['trace_fim'].logger = self.logger
+        if 'run_stats' in self.extra_modules:
+            self.extra_modules['run_stats'].logger = self.logger
             
             
     def run_epoch(self, phase, config):
@@ -276,7 +278,7 @@ class TrainerClassification:
                     step_assets['evaluators']['run_stats/model_gradient_norm_squared_from_pytorch'] = norm.item() ** 2
                     
                 if self.extra_modules['run_stats'] is not None and config.run_stats_multi and self.global_step % config.run_stats_multi == 0:
-                    step_assets['evaluators'] = self.extra_modules['run_stats'](step_assets['evaluators'], 'l2', self.global_step)
+                    self.extra_modules['run_stats']('l2', self.global_step)
                     
                 self.optim.step()
                 

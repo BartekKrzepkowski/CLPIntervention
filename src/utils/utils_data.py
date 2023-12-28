@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 
 
 def count_classes(dataset):
-    classes = len(np.unique(np.array(dataset.targets)))
-    return len(set(classes))
+    classes = len(np.unique(np.array(dataset.dataset.targets)))
+    return classes
 
 #write a function to calculate mean and std of cifar10
 def get_mean_std(dataloader):

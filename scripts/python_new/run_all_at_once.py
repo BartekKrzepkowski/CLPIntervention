@@ -129,9 +129,9 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     
     
     held_out = {}
-    # held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    # held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    # held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
+    held_out['proper_x_left'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
+    held_out['proper_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
+    held_out['blurred_x_right'] = torch.load(f'data/{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
     
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
@@ -139,7 +139,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     
     extra_modules = defaultdict(lambda: None)
     extra_modules['run_stats'] = RunStatsBiModal(model, optim)
-    # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
+    extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
     
     
     # ════════════════════════ prepare trainer ════════════════════════ #
@@ -197,8 +197,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     
     
     logging.info(f'The built model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable parameters and {sum(p.numel() for p in model.parameters() if not p.requires_grad)} non trainable parameters.')
-    logging.info(f'The dataset has {len(loaders["train"].dataset)} train samples, {len(loaders["test_proper"].dataset)} test samples, {num_classes} classes,\
-        each image has a dimension of {input_channels}x{img_height}x{img_width} and each epoch has {batches_per_epoch} batches.')
+    logging.info(f'The dataset has {len(loaders["train"].dataset)} train samples, {len(loaders["test_proper"].dataset)} test samples, {num_classes} classes, each image has a dimension of {input_channels}x{img_height}x{img_width} and each epoch has {batches_per_epoch} batches.')
     
     if exp_name == 'phase1':
         trainer.run_phase1(config)
@@ -225,6 +224,6 @@ if __name__ == "__main__":
             handlers=[logging.StreamHandler()],
             force=True,
         )
-    logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={phase1}, phase2={conf.phase2}, phase3={phase3}, phase4={conf.phase4}.')
+    logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={conf.phase1}, phase2={conf.phase2}, phase3={conf.phase3}, phase4={conf.phase4}.')
     
     objective('all_at_once', conf.model_name, conf.dataset_name, conf.lr, conf.wd, conf.phase1, conf.phase2, conf.phase3, conf.phase4)

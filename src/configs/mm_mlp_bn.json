@@ -1,0 +1,4 @@
+{
+    "activation_name": "relu",
+    "hidden_layers_dim": [256, 256, 256, 256, 256, 128]
+}

@@ -15,24 +15,24 @@ class MMSimpleCNN(torch.nn.Module):
         self.scaling_factor = 2 if wheter_concate else 1
         
         self.left_branch = torch.nn.ModuleList([
-            torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1),
+            torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1),
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2),
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2))
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
         self.right_branch = torch.nn.ModuleList([
-            torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1),
+            torch.nn.Sequential(torch.nn.Conv2d(layer_dim1, layer_dim2, 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1),
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2),
+                                torch.nn.Conv2d(layer_dim2, layer_dim2, 5, padding=2, stride=2, bias=False),
                                 torch.nn.BatchNorm2d(layer_dim2))
             for layer_dim1, layer_dim2 in zip(layers_dim[:-3], layers_dim[1:-2])
         ])
@@ -43,19 +43,19 @@ class MMSimpleCNN(torch.nn.Module):
         flatten_dim = int(self.height * self.width * pre_mlp[-1])
         
         self.main_branch = torch.nn.ModuleList([
-            torch.nn.Sequential(torch.nn.Conv2d(pre_mlp[i], pre_mlp[i+1], 3, padding=1),
+            torch.nn.Sequential(torch.nn.Conv2d(pre_mlp[i], pre_mlp[i+1], 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1),
+                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
                                 common.ACT_NAME_MAP[activation_name](),
-                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1),
+                                torch.nn.Conv2d(pre_mlp[i+1], pre_mlp[i+1], 3, padding=1, bias=False),
                                 torch.nn.BatchNorm2d(pre_mlp[i+1]),
                                 common.ACT_NAME_MAP[activation_name]()
                             )
             for i in range(pre_mlp_depth)
         ])
-        self.final_layer = torch.nn.Sequential(torch.nn.Linear(flatten_dim, layers_dim[-2]),
+        self.final_layer = torch.nn.Sequential(torch.nn.Linear(flatten_dim, layers_dim[-2], bias=False),
                                                torch.nn.BatchNorm1d(layers_dim[-2]),
                                                common.ACT_NAME_MAP[activation_name](),
                                                torch.nn.Linear(layers_dim[-2], layers_dim[-1]))

@@ -95,7 +95,7 @@ def get_tinyimagenet(proper_normalization=True):
     else:
         mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
     train_path = f'{dataset_path}/train'
-    test_path = f'{dataset_path}/val/images'
+    test_path = f'{dataset_path}/val'
     transform_eval = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
@@ -116,7 +116,7 @@ def get_tinyimagenet(proper_normalization=True):
 def get_mm_tinyimagenet(dataset_path=None, overlap=0.0, resize_factor=1/4):
     dataset_path = dataset_path if dataset_path is not None else os.environ['TINYIMAGENET_PATH']
     train_path = f'{dataset_path}/train'
-    test_path = f'{dataset_path}/val/images'
+    test_path = f'{dataset_path}/val'
     
     train_dataset = datasets.ImageFolder(train_path)
     train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_tinyimagenet.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_tinyimagenet.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True)

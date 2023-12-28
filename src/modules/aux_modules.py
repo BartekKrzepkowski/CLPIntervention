@@ -22,7 +22,7 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
         self.ft_criterion = vmap(self.grad_and_trace, in_dims=(None, None, None, 0), randomness="different")
         self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
-        print("penalized_parameter_names: ", self.penalized_parameter_names)
+        print("\n penalized parameter names TFIM: ", self.penalized_parameter_names, '\n')
         self.labels = torch.arange(num_classes).to(self.device)
         self.logger = None
         
@@ -49,15 +49,15 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
                 sample_traces[param_name] = trace_p
         return sample_traces
 
-    def forward(self, step, config, kind):
+    def forward(self, global_step, config, kind):
         self.model.eval()
         x_true1 = self.held_out_proper_x_left.to(self.device)
         x_true2 = self.held_out_proper_x_right.to(self.device) if kind == 'proper' else self.held_out_blurred_x_right.to(self.device)
         
         params = {n: p.detach() for n, p in self.model.named_parameters() if n in self.penalized_parameter_names and p.requires_grad}
-        params1 = {n: p for n, p in params.items() if 'net1' in n}
-        params2 = {n: p for n, p in params.items() if 'net2' in n}
-        params3 = {n: p for n, p in params.items() if 'net3' in n}
+        params1 = {n: p for n, p in params.items() if 'left_branch' in n}
+        params2 = {n: p for n, p in params.items() if 'right_branch' in n}
+        params3 = {n: p for n, p in params.items() if 'main_branch' in n}
         buffers = {}
         ft_per_sample_grads1 = self.ft_criterion(params1, buffers, config, (x_true1, x_true2))
         ft_per_sample_grads1 = {k1: v.detach().data for k1, v in ft_per_sample_grads1.items()}
@@ -72,31 +72,63 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
         params_names3 = [n for n, _ in params3.items()]
         evaluators = defaultdict(float)
         overall_trace = 0.0
-        overall_trace1 = 0.0
-        overall_trace2 = 0.0
-        overall_trace3 = 0.0
+        overall_trace1_bias = 0.0
+        overall_trace1_weight = 0.0
+        overall_trace2_bias = 0.0
+        overall_trace2_weight = 0.0
+        overall_trace3_bias = 0.0
+        overall_trace3_weight = 0.0
         for param_name in ft_per_sample_grads:
             trace_p = ft_per_sample_grads[param_name].mean()          
             evaluators[f'trace_fim_{kind}/{param_name}'] += trace_p.item()
             if param_name in self.penalized_parameter_names:
-                overall_trace += trace_p.item()
+                # overall_trace += trace_p.item()
                 if param_name in params_names1:
-                    overall_trace1 += trace_p.item()
+                    if 'bias' in param_name:
+                        overall_trace1_bias += trace_p.item()
+                    elif 'weight' in param_name:
+                        overall_trace1_weight += trace_p.item()
+                    else:
+                        raise ValueError("The parameters are neither biases nor weights.")
                 elif param_name in params_names2:
-                    overall_trace2 += trace_p.item()
+                    if 'bias' in param_name:
+                        overall_trace2_bias += trace_p.item()
+                    elif 'weight' in param_name:
+                        overall_trace2_weight += trace_p.item()
+                    else:
+                        raise ValueError("The parameters are neither biases nor weights.")
                 elif param_name in params_names3:
-                    overall_trace3 += trace_p.item()
+                    if 'bias' in param_name:
+                        overall_trace3_bias += trace_p.item()
+                    elif 'weight' in param_name:
+                        overall_trace3_weight += trace_p.item()
+                    else:
+                        raise ValueError("The parameters are neither biases nor weights.")
         
-        evaluators[f'trace_fim_{kind}/overall_trace'] = overall_trace
-        evaluators[f'trace_fim_{kind}/overall_trace1'] = overall_trace1
-        evaluators[f'trace_fim_{kind}/overall_trace2'] = overall_trace2
-        evaluators[f'trace_fim_{kind}/overall_trace3'] = overall_trace3
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_2'] = overall_trace1 / (overall_trace2 + 1e-10)
+        evaluators[f'trace_fim_overall/{kind}_trace_bias'] = overall_trace1_bias + overall_trace2_bias + overall_trace3_bias
+        evaluators[f'trace_fim_overall/{kind}_trace_weight'] = overall_trace1_weight + overall_trace2_weight + overall_trace3_weight
+        evaluators[f'trace_fim_overall/{kind}_trace'] = evaluators[f'trace_fim_overall/{kind}_trace_bias'] + evaluators[f'trace_fim_overall/{kind}_trace_weight']
+        
+        evaluators[f'trace_fim_overall/{kind}_trace1_bias'] = overall_trace1_bias
+        evaluators[f'trace_fim_overall/{kind}_trace1_weight'] = overall_trace1_weight
+        evaluators[f'trace_fim_overall/{kind}_trace1'] = overall_trace1_bias + overall_trace1_weight
+        
+        evaluators[f'trace_fim_overall/{kind}_trace2_bias'] = overall_trace2_bias
+        evaluators[f'trace_fim_overall/{kind}_trace2_weight'] = overall_trace2_weight
+        evaluators[f'trace_fim_overall/{kind}_trace2'] = overall_trace2_bias + overall_trace2_weight
+        
+        evaluators[f'trace_fim_overall/{kind}_trace3_bias'] = overall_trace3_bias
+        evaluators[f'trace_fim_overall/{kind}_trace3_weight'] = overall_trace3_weight
+        evaluators[f'trace_fim_overall/{kind}_trace3'] = overall_trace3_bias + overall_trace3_weight
+        
+        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_bias'] = overall_trace1_bias / (overall_trace2_bias + 1e-10)
+        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_weight'] = overall_trace1_weight / (overall_trace2_weight + 1e-10)
+        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right'] = (overall_trace1_bias + overall_trace1_weight) / (overall_trace2_bias + overall_trace2_weight + 1e-10)
         # evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
         # evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
-        evaluators['steps/trace_fim'] = step
+        evaluators['steps/trace_fim'] = global_step
         self.model.train()
-        self.logger.log_scalars(evaluators, step)    
+        self.logger.log_scalars(evaluators, global_step)    
         
         
 class TraceFIM__(torch.nn.Module):

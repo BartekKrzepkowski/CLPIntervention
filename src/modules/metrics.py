@@ -145,18 +145,22 @@ class RunStatsBiModal(torch.nn.Module):
         self.right_branch_trajectory_length_overall = 0.0
         self.main_branch_trajectory_length_overall = 0.0
         self.allowed_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
+        self.logger = None
+        self.eps = torch.tensor(1e-9)
         
-    def forward(self, evaluators, distance_type, global_step):          
+    def forward(self, distance_type, global_step):          
+        evaluators = defaultdict(float)
         self.model.eval()
         # self.count_dead_neurons(evaluators)
         self.model_trajectory_length(evaluators)
         self.distance_between_models(self.model, self.model_zero, evaluators, distance_type, dist_label='distance_from initialization')
         self.distance_between_models(self.model, self.last_model, evaluators, distance_type, dist_label='distance_from_last_checkpoint')
         self.distance_between_branches(self.model, self.model, evaluators, distance_type, dist_label='distance_between_branches')
-        self.model.train()
+        self.distance_between_branches(self.model, self.model, evaluators, distance_type='angle', dist_label='distance_between_branches')
         self.last_model = deepcopy(self.model)
         evaluators['steps/run_stats'] = global_step
-        return evaluators
+        self.model.train()
+        self.logger.log_scalars(evaluators, global_step)   
     
     def model_trajectory_length(self, evaluators, norm_type=2.0): # odłączyć liczenie normy gradientu od liczenia długości trajektorii
         '''
@@ -167,82 +171,200 @@ class RunStatsBiModal(torch.nn.Module):
         named_parameters1 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'left_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
+        weight_sign_proportion_mean1_bias = []
+        weight_sign_proportion_std1_bias = []
+        weight_sign_proportion_mean1_weight = []
+        weight_sign_proportion_std1_weight = []
+        neurons_counter1_bias = []
+        neurons_counter1_weight = []
         for n, p in named_parameters1:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
             evaluators[f'run_stats_model_weight_norm_squared/left_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
             evaluators[f'run_stats_model_gradient_norm_squared/left_branch_{n}'] = grad_norm_per_layer.item() ** 2
             evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/left_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/left_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/left_branch_{n}'])
+            mean, std = self.weights_sign_proportion(p.data)
+            evaluators[f'run_stats_model_weights_sign_proporion_mean/left_branch_{n}'] = mean
+            evaluators[f'run_stats_model_weights_sign_proporion_std/left_branch_{n}'] = std
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
+                if 'bias' in n:
+                    weight_sign_proportion_mean1_bias.append(mean)
+                    weight_sign_proportion_std1_bias.append(std)
+                    neurons_counter1_bias.append(p.data.shape[0])
+                elif 'weight' in n:
+                    weight_sign_proportion_mean1_weight.append(mean)
+                    weight_sign_proportion_std1_weight.append(std)
+                    neurons_counter1_weight.append(p.data.shape[0])
+                else:
+                    raise ValueError("The parameters are neither biases nor weights.")
+                
             self.left_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
             evaluators[f'run_stats_model_trajectory_length_group/left_branch_{n}'] = self.left_branch_trajectory_length_group[n]
             
         weight_norm1 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/left_branch_weight_norm_squared_overall'] = weight_norm1 ** 2
+        evaluators[f'run_stats_overall/left_branch_weight_norm_squared'] = weight_norm1 ** 2
         grad_norm1 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/left_branch_gradient_norm_squared_overall'] = grad_norm1 ** 2
-        evaluators[f'run_stats/left_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/left_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/left_branch_weight_norm_squared_overall'])
+        evaluators[f'run_stats_overall/left_branch_gradient_norm_squared'] = grad_norm1 ** 2
+        evaluators[f'run_stats_overall/left_branch_grad_weight_norm_ratio_squared'] = evaluators[f'run_stats_overall/left_branch_gradient_norm_squared'] / (1e-9 + evaluators[f'run_stats_overall/left_branch_weight_norm_squared'])
         self.left_branch_trajectory_length_overall += lr * grad_norm1
-        evaluators['run_stats/left_branch_trajectory_length_overall'] = self.left_branch_trajectory_length_overall
+        evaluators['run_stats_overall/left_branch_trajectory_length'] = self.left_branch_trajectory_length_overall
+        # sign proportion
+        overall_mean_bias, overall_std_bias = self.overall_mean_and_std(weight_sign_proportion_mean1_bias, weight_sign_proportion_std1_bias, neurons_counter1_bias)
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_mean_bias'] = overall_mean_bias
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_std_bias'] = overall_std_bias
+        overall_mean_weight, overall_std_weight = self.overall_mean_and_std(weight_sign_proportion_mean1_weight, weight_sign_proportion_std1_weight, neurons_counter1_weight)
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_mean_weight'] = overall_mean_weight
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_std_weight'] = overall_std_weight
+        weight_sign_proportion_mean1 = weight_sign_proportion_mean1_bias + weight_sign_proportion_mean1_weight
+        weight_sign_proportion_std1 = weight_sign_proportion_std1_bias + weight_sign_proportion_std1_weight
+        neurons_counter1 = neurons_counter1_bias + neurons_counter1_weight
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean1, weight_sign_proportion_std1, neurons_counter1)
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_mean'] = overall_mean
+        evaluators['run_stats_overall/left_branch_weights_sign_proporion_std'] = overall_std
         #-----------------------------------------------------------------------------------------------------------------
         named_parameters2 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'right_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
+        weight_sign_proportion_mean2_bias = []
+        weight_sign_proportion_std2_bias = []
+        weight_sign_proportion_mean2_weight = []
+        weight_sign_proportion_std2_weight = []
+        neurons_counter2_bias = []
+        neurons_counter2_weight = []
         for n, p in named_parameters2:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
             evaluators[f'run_stats_model_weight_norm_squared/right_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
             evaluators[f'run_stats_model_gradient_norm_squared/right_branch_{n}'] = grad_norm_per_layer.item() ** 2
+            mean, std = self.weights_sign_proportion(p.data)
+            evaluators[f'run_stats_model_weights_sign_proporion_mean/right_branch_{n}'] = mean
+            evaluators[f'run_stats_model_weights_sign_proporion_std/right_branch_{n}'] = std
             # evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/right_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/right_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/right_branch_{n}'])
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
+                if 'bias' in n:
+                    weight_sign_proportion_mean2_bias.append(mean)
+                    weight_sign_proportion_std2_bias.append(std)
+                    neurons_counter2_bias.append(p.data.shape[0])
+                elif 'weight' in n:
+                    weight_sign_proportion_mean2_weight.append(mean)
+                    weight_sign_proportion_std2_weight.append(std)
+                    neurons_counter2_weight.append(p.data.shape[0])
+                else:
+                    raise ValueError("The parameters are neither biases nor weights.")
             self.right_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
             evaluators[f'run_stats_model_trajectory_length_group/right_branch_{n}'] = self.right_branch_trajectory_length_group[n]
             
         weight_norm2 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/right_branch_weight_norm_squared_overall'] = weight_norm2 ** 2
+        evaluators[f'run_stats_overall/right_branch_weight_norm_squared'] = weight_norm2 ** 2
         grad_norm2 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/right_branch_gradient_norm_squared_overall'] = grad_norm2 ** 2
+        evaluators[f'run_stats_overall/right_branch_gradient_norm_squared'] = grad_norm2 ** 2
         # evaluators[f'run_stats/right_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/right_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/right_branch_weight_norm_squared_overall'])
         self.right_branch_trajectory_length_overall += lr * grad_norm2
-        evaluators['run_stats/right_branch_trajectory_length_overall'] = self.right_branch_trajectory_length_overall
+        evaluators['run_stats_overall/right_branch_trajectory_length'] = self.right_branch_trajectory_length_overall
+        # sign proportion
+        overall_mean_bias, overall_std_bias = self.overall_mean_and_std(weight_sign_proportion_mean2_bias, weight_sign_proportion_std2_bias, neurons_counter2_bias)
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_mean_bias'] = overall_mean_bias
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_std_bias'] = overall_std_bias
+        overall_mean_weight, overall_std_weight = self.overall_mean_and_std(weight_sign_proportion_mean2_weight, weight_sign_proportion_std2_weight, neurons_counter2_weight)
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_mean_weight'] = overall_mean_weight
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_std_weight'] = overall_std_weight
+        weight_sign_proportion_mean2 = weight_sign_proportion_mean2_bias + weight_sign_proportion_mean2_weight
+        weight_sign_proportion_std2 = weight_sign_proportion_std2_bias + weight_sign_proportion_std2_weight
+        neurons_counter2 = neurons_counter2_bias + neurons_counter2_weight
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean2, weight_sign_proportion_std2, neurons_counter2)
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_mean'] = overall_mean
+        evaluators['run_stats_overall/right_branch_weights_sign_proporion_std'] = overall_std
         #-----------------------------------------------------------------------------------------------------------------
         named_parameters3 = [(n, p) for n, p in self.model.named_parameters() if p.requires_grad and 'main_branch' in n]
         weight_norm_layers = []
         grad_norm_layers = []
+        weight_sign_proportion_mean3_bias = []
+        weight_sign_proportion_std3_bias = []
+        weight_sign_proportion_mean3_weight = []
+        weight_sign_proportion_std3_weight = []
+        neurons_counter3_bias = []
+        neurons_counter3_weight = []
         for n, p in named_parameters3:
             weight_norm_per_layer = torch.norm(p.data, norm_type)
             evaluators[f'run_stats_model_weight_norm_squared/main_branch_{n}'] = weight_norm_per_layer.item() ** 2
             grad_norm_per_layer = torch.norm(p.grad, norm_type) if p.grad is not None else torch.tensor(0.0)
             evaluators[f'run_stats_model_gradient_norm_squared/main_branch_{n}'] = grad_norm_per_layer.item() ** 2
+            mean, std = self.weights_sign_proportion(p.data)
+            evaluators[f'run_stats_model_weights_sign_proporion_mean/main_branch_{n}'] = mean
+            evaluators[f'run_stats_model_weights_sign_proporion_std/main_branch_{n}'] = std
             # evaluators[f'run_stats_model_grad_weight_norm_ratio_squared/main_branch_{n}'] = evaluators[f'run_stats_model_gradient_norm_squared/main_branch_{n}'] / (1e-9 + evaluators[f'run_stats_model_weight_norm_squared/main_branch_{n}'])
             if n in self.allowed_parameter_names:
                 weight_norm_layers.append(weight_norm_per_layer)
                 grad_norm_layers.append(grad_norm_per_layer)
+                if 'bias' in n:
+                    weight_sign_proportion_mean3_bias.append(mean)
+                    weight_sign_proportion_std3_bias.append(std)
+                    neurons_counter3_bias.append(p.data.shape[0])
+                elif 'weight' in n:
+                    weight_sign_proportion_mean3_weight.append(mean)
+                    weight_sign_proportion_std3_weight.append(std)
+                    neurons_counter3_weight.append(p.data.shape[0])
+                else:
+                    raise ValueError("The parameters are neither biases nor weights.")
             self.main_branch_trajectory_length_group[n] += lr * grad_norm_per_layer.item()
             evaluators[f'run_stats_model_trajectory_length_group/main_branch_{n}'] = self.main_branch_trajectory_length_group[n]
             
         weight_norm3 = torch.norm(torch.stack(weight_norm_layers), norm_type).item()
-        evaluators[f'run_stats/main_branch_weight_norm_squared_overall'] = weight_norm3 ** 2
+        evaluators[f'run_stats_overall/main_branch_weight_norm_squared'] = weight_norm3 ** 2
         grad_norm3 = torch.norm(torch.stack(grad_norm_layers), norm_type).item()
-        evaluators[f'run_stats/main_branch_gradient_norm_squared_overall'] = grad_norm3 ** 2
+        evaluators[f'run_stats_overall/main_branch_gradient_norm_squared'] = grad_norm3 ** 2
         # evaluators[f'run_stats/main_branch_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/main_branch_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/main_branch_weight_norm_squared_overall'])
         self.main_branch_trajectory_length_overall += lr * grad_norm3
-        evaluators['run_stats/main_branch_trajectory_length_overall'] = self.main_branch_trajectory_length_overall
+        evaluators['run_stats_overall/main_branch_trajectory_length'] = self.main_branch_trajectory_length_overall
+        # sign proportion
+        overall_mean_bias, overall_std_bias = self.overall_mean_and_std(weight_sign_proportion_mean3_bias, weight_sign_proportion_std3_bias, neurons_counter3_bias)
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_mean_bias'] = overall_mean_bias
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_std_bias'] = overall_std_bias
+        overall_mean_weight, overall_std_weight = self.overall_mean_and_std(weight_sign_proportion_mean3_weight, weight_sign_proportion_std3_weight, neurons_counter3_weight)
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_mean_weight'] = overall_mean_weight
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_std_weight'] = overall_std_weight
+        weight_sign_proportion_mean3 = weight_sign_proportion_mean3_bias + weight_sign_proportion_mean3_weight
+        weight_sign_proportion_std3 = weight_sign_proportion_std3_bias + weight_sign_proportion_std3_weight
+        neurons_counter3 = neurons_counter3_bias + neurons_counter3_weight
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean3, weight_sign_proportion_std3, neurons_counter3)
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_mean'] = overall_mean
+        evaluators['run_stats_overall/main_branch_weights_sign_proporion_std'] = overall_std
         #-----------------------------------------------------------------------------------------------------------------
-        evaluators[f'run_stats/left_to_right_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm2 ** 2 + 1e-9)
-        evaluators[f'run_stats/left_to_main_gradient_norm_squared_overall'] = grad_norm1 ** 2 / (grad_norm3 ** 2 + 1e-9)
-        evaluators[f'run_stats/right_to_main_gradient_norm_squared_overall'] = grad_norm2 ** 2 / (grad_norm3 ** 2 + 1e-9)
+        evaluators[f'run_stats_overall/left_to_right_gradient_norm_squared'] = grad_norm1 ** 2 / (grad_norm2 ** 2 + 1e-9)
+        evaluators[f'run_stats_overall/left_to_main_gradient_norm_squared'] = grad_norm1 ** 2 / (grad_norm3 ** 2 + 1e-9)
+        evaluators[f'run_stats_overall/right_to_main_gradient_norm_squared'] = grad_norm2 ** 2 / (grad_norm3 ** 2 + 1e-9)
         weight_norm = torch.norm(torch.stack([torch.tensor(weight_norm1), torch.tensor(weight_norm2), torch.tensor(weight_norm3)]), norm_type).item()
-        evaluators[f'run_stats/model_weight_norm_squared_overall'] = weight_norm ** 2
+        evaluators[f'run_stats_overall/model_weight_norm_squared'] = weight_norm ** 2
         grad_norm = torch.norm(torch.stack([torch.tensor(grad_norm1), torch.tensor(grad_norm2), torch.tensor(grad_norm3)]), norm_type).item()
-        evaluators[f'run_stats/model_gradient_norm_squared_overall'] = grad_norm ** 2
+        evaluators[f'run_stats_overall/model_gradient_norm_squared'] = grad_norm ** 2
         # evaluators[f'run_stats/model_grad_weight_norm_ratio_squared_overall'] = evaluators[f'run_stats/model_gradient_norm_squared_overall'] / (1e-9 + evaluators[f'run_stats/model_weight_norm_squared_overall'])
         self.model_trajectory_length_overall += lr * grad_norm
-        evaluators['run_stats/model_trajectory_length_overall'] = self.model_trajectory_length_overall
+        evaluators['run_stats_overall/model_trajectory_length'] = self.model_trajectory_length_overall
+        # sign proportion
+        neurons_counter_bias = neurons_counter1_bias + neurons_counter2_bias + neurons_counter3_bias
+        weight_sign_proportion_mean_bias = weight_sign_proportion_mean1_bias + weight_sign_proportion_mean2_bias + weight_sign_proportion_mean3_bias
+        weight_sign_proportion_std_bias = weight_sign_proportion_std1_bias + weight_sign_proportion_std2_bias + weight_sign_proportion_std3_bias
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean_bias, weight_sign_proportion_std_bias, neurons_counter_bias)
+        evaluators['run_stats_overall/model_weights_sign_proporion_mean_bias'] = overall_mean
+        evaluators['run_stats_overall/model_weights_sign_proporion_std_bias'] = overall_std
+        neurons_counter_weight = neurons_counter1_weight + neurons_counter2_weight + neurons_counter3_weight
+        weight_sign_proportion_mean_weight = weight_sign_proportion_mean1_weight + weight_sign_proportion_mean2_weight + weight_sign_proportion_mean3_weight
+        weight_sign_proportion_std_weight = weight_sign_proportion_std1_weight + weight_sign_proportion_std2_weight + weight_sign_proportion_std3_weight
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean_weight, weight_sign_proportion_std_weight, neurons_counter_weight)
+        evaluators['run_stats_overall/model_weights_sign_proporion_mean_weight'] = overall_mean
+        evaluators['run_stats_overall/model_weights_sign_proporion_std_weight'] = overall_std
+        neurons_counter = neurons_counter_bias + neurons_counter_weight
+        weight_sign_proportion_mean = weight_sign_proportion_mean_bias + weight_sign_proportion_mean_weight
+        weight_sign_proportion_std = weight_sign_proportion_std_bias + weight_sign_proportion_std_weight
+        overall_mean, overall_std = self.overall_mean_and_std(weight_sign_proportion_mean, weight_sign_proportion_std, neurons_counter)
+        evaluators['run_stats_overall/model_weights_sign_proporion_mean'] = overall_mean
+        evaluators['run_stats_overall/model_weights_sign_proporion_std'] = overall_std
+        
+        
     
     def distance_between_models(self, model1, model2, evaluators, distance_type, dist_label):
         def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, norm_type=2.0, branch_name=None):
@@ -256,7 +378,7 @@ class RunStatsBiModal(torch.nn.Module):
                     distances.append(dist)
                 evaluators[f'run_stats_{dist_label}_l2/{branch_name}_{n1}'] = dist.item()
             distance = torch.norm(torch.stack(distances), norm_type)
-            evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] = distance.item()
+            evaluators[f'run_stats_overall/{branch_name}_{dist_label}_l2'] = distance.item()
         
         def distance_between_models_cosine(named_parameters1, named_parameters2, dist_label, branch_name):
             """
@@ -301,10 +423,10 @@ class RunStatsBiModal(torch.nn.Module):
         else:
             raise ValueError(f'Distance type {distance_type} not supported.')
         #-----------------------------------------------------------------------------------------------------------------
-        evaluators[f'run_stats/model_{dist_label}_l2'] = sum([evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] for branch_name in ['left_branch', 'right_branch', 'main_branch']])
+        evaluators[f'run_stats_overall/model_{dist_label}_l2'] = np.sqrt(sum([evaluators[f'run_stats_overall/{branch_name}_{dist_label}_l2'] ** 2 for branch_name in ['left_branch', 'right_branch', 'main_branch']]))
         
     def distance_between_branches(self, model1, model2, evaluators, distance_type, dist_label):
-        def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, norm_type=2.0, branch_name=None):
+        def distance_between_models_l2(named_parameters1, named_parameters2, dist_label, branch_name=None, norm_type=2.0):
             """
             Returns the l2 distance between two models.
             """
@@ -314,21 +436,92 @@ class RunStatsBiModal(torch.nn.Module):
                 dist = torch.norm(p1-p2, norm_type)
                 if n1 in self.allowed_parameter_names:
                     distances.append(dist)
+                n1 = '.'.join(n1.split('.')[1:])
                 evaluators[f'run_stats_{dist_label}_l2/{branch_name}_{n1}'] = dist.item()
             distance = torch.norm(torch.stack(distances), norm_type)
-            evaluators[f'run_stats/{branch_name}_{dist_label}_l2'] = distance.item()
+            evaluators[f'run_stats_overall/{dist_label}_l2'] = distance.item()
+            
+        def distance_between_models_angle(named_parameters1, named_parameters2, named_parameters3, named_parameters4, dist_label, branch_name, norm_type=2.0):
+            """
+            TODO
+            Returns the cosine distance between two models.
+            """
+            left_norms = []
+            right_norms = []
+            global_numerator = 0.0
+            for (n1, p1), (_, p2), (_, p3), (_, p4) in zip(named_parameters1, named_parameters2, named_parameters3, named_parameters4):
+                v1 = (p1 - p3).view(-1)
+                v2 = (p2 - p4).view(-1)
+                numerator = (v1 @ v2)
+                left_norm, right_norm = v1.norm(norm_type), v2.norm(norm_type)
+                if n1 in self.allowed_parameter_names:
+                    global_numerator += numerator
+                    left_norms.append(left_norm)
+                    right_norms.append(right_norm)
+                n1 = '.'.join(n1.split('.')[1:])
+                evaluators[f'run_stats_{dist_label}_angle_in_radians_over_pi/{branch_name}_{n1}'] = torch.arccos(numerator / (left_norm * right_norm + self.eps)).item() / torch.pi
+            overall_left_norm = torch.norm(torch.stack(left_norms), norm_type)
+            overall_right_norm = torch.norm(torch.stack(right_norms), norm_type)
+            evaluators[f'run_stats_overall/{dist_label}_angle_in_radians_over_pi'] = torch.arccos(global_numerator / (overall_left_norm * overall_right_norm + self.eps)).item() / torch.pi
+            
         """
         Returns the distance between two branches.
         """
         named_parameters1 = [(n, p) for n, p in model1.named_parameters() if p.requires_grad and 'left_branch' in n]
         named_parameters2 = [(n, p) for n, p in model2.named_parameters() if p.requires_grad and 'right_branch' in n]
+        named_parameters3 = [(n, p) for n, p in self.model_zero.named_parameters() if p.requires_grad and 'left_branch' in n]
+        named_parameters4 = [(n, p) for n, p in self.model_zero.named_parameters() if p.requires_grad and 'right_branch' in n]
         if distance_type == 'l2':
             distance_between_models_l2(named_parameters1, named_parameters2, dist_label=dist_label, branch_name='both_branches')
-        elif distance_type == 'cosine':
-            pass
+        elif distance_type == 'angle':
+            distance_between_models_angle(named_parameters1, named_parameters2, named_parameters3, named_parameters4, dist_label=dist_label, branch_name='both_branches')
             # distance_between_models_cosine(named_parameters1, named_parameters2, net_nb=2)
         else:
             raise ValueError(f'Distance type {distance_type} not supported.')
+        
+        
+    def weights_sign_proportion(self, weights):
+        weights = (weights.cpu() >= 0).reshape(weights.shape[0], -1)  # (liczba neuronów, liczba parametrów)
+        distrib = (2 * weights.sum(axis=1) - weights.shape[1]) / weights.shape[1]  # (b-a)/(a+b)
+        mean = distrib.mean().item()
+        std = distrib.std(correction=0).item()
+        return mean, std
+    
+    
+    def overall_mean_and_std(self, means, stds, counts):
+        """
+        Oblicza odchylenie standardowe dla sumy grup danych.
+
+        :param groups: Lista krotek, gdzie każda krotka zawiera średnią (mean) i odchylenie standardowe (std) danej grupy.
+        :return: Odchylenie standardowe sumy grup.
+        """
+        assert len(means) == len(stds) and len(means) == len(counts) and len(stds) == len(counts), "Lengths of lists are not equal."
+        if len(counts) == 0:
+            return 0.0, 0.0
+        # Wartości początkowe dla sumy średnich i sumy liczebności
+        total_mean_sum = 0
+        total_count = 0
+
+        # Obliczanie sumy średnich i sumy liczebności
+        for mean, std, count in zip(means, stds, counts):
+            total_mean_sum += mean * count
+            total_count += count
+
+        # Średnia dla całkowitej sumy
+        overall_mean = total_mean_sum / total_count
+        # Wartość początkowa dla sumy wariancji
+        variance_sum = 0
+
+        # Obliczanie sumy wariancji
+        for mean, std, count in zip(means, stds, counts):
+            variance_sum += ((std ** 2) * count) + count * ((mean - overall_mean) ** 2)
+
+        # Wariancja dla sumy grup
+        overall_variance = variance_sum / total_count
+
+        # Odchylenie standardowe dla sumy grup
+        return overall_mean, np.sqrt(overall_variance)
+        
         
         
     def count_dead_neurons(self, evaluators):
