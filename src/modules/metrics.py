@@ -153,7 +153,7 @@ class RunStatsBiModal(torch.nn.Module):
         self.model.eval()
         # self.count_dead_neurons(evaluators)
         self.model_trajectory_length(evaluators)
-        self.distance_between_models(self.model, self.model_zero, evaluators, distance_type, dist_label='distance_from initialization')
+        self.distance_between_models(self.model, self.model_zero, evaluators, distance_type, dist_label='distance_from_initialization')
         self.distance_between_models(self.model, self.last_model, evaluators, distance_type, dist_label='distance_from_last_checkpoint')
         self.distance_between_branches(self.model, self.model, evaluators, distance_type, dist_label='distance_between_branches')
         self.distance_between_branches(self.model, self.model, evaluators, distance_type='angle', dist_label='distance_between_branches')

@@ -31,5 +31,8 @@ class WandbLogger:
 
     def log_scalars(self, evaluators, step):
         self.writer.log(evaluators)
+        
+    def log_plots(self, plot_images):
+        self.writer.log(plot_images)
 
 

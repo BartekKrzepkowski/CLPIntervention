@@ -43,6 +43,7 @@ class TrainerClassification:
                 }
         config.kind = 'blurred'
         self.loaders['train'].dataset.transform2 = TRANSFORMS_BLURRED_RIGHT_NAME_MAP[config.logger_config['hyperparameters']['type_names']['dataset']](config.overlap)
+        
         self.run_loop(config.exp_starts_at_epoch, config.exp_ends_at_epoch, config)
 
         step = f'epoch_{self.epoch + 1}'
@@ -193,16 +194,16 @@ class TrainerClassification:
         for epoch in trange(exp_starts_at_epoch, exp_ends_at_epoch, desc='run_exp', leave=True, position=0,
                             colour='green', disable=config.whether_disable_tqdm):
             self.epoch = epoch
-            if epoch % 40 == 0 or (epoch % 20 == 0 and epoch < 80) :
+            if epoch % 20 == 0:# or (epoch % 1 == 0 and epoch < 80 and epoch > 60):  # there is a problem when till this epoch > 80, to powinno być zapisywane według relatywnego numerowania
                 step = f'epoch_{epoch}'
                 save_model(self.model, self.save_path(step))
                 
             self.model.train()
             self.run_epoch(phase='train', config=config)
             self.model.eval()
-            with torch.no_grad():
-                self.run_epoch(phase='test_proper', config=config)
-                self.run_epoch(phase='test_blurred', config=config)
+            # with torch.no_grad():
+            self.run_epoch(phase='test_proper', config=config)
+            self.run_epoch(phase='test_blurred', config=config)
                 
         logging.info('Training completed.')
             
@@ -218,18 +219,33 @@ class TrainerClassification:
         
         self.logger.log_model(self.model, self.criterion, log=None)
         
-        if 'stiffness' in self.extra_modules:
-            self.extra_modules['stiffness'].logger = self.logger
-        if 'hooks_dead_relu' in self.extra_modules:
-            self.extra_modules['hooks_dead_relu'].logger = self.logger
-        if 'hooks_acts' in self.extra_modules:
-            self.extra_modules['hooks_acts'].logger = self.logger
-        if 'tunnel' in self.extra_modules:
-            self.extra_modules['tunnel'].logger = self.logger
-        if 'trace_fim' in self.extra_modules:
-            self.extra_modules['trace_fim'].logger = self.logger
         if 'run_stats' in self.extra_modules:
             self.extra_modules['run_stats'].logger = self.logger
+        if 'stiffness_train' in self.extra_modules:
+            self.extra_modules['stiffness_train'].logger = self.logger
+        if 'stiffness_test' in self.extra_modules:
+            self.extra_modules['stiffness_test'].logger = self.logger
+            
+        if 'dead_relu_left' in self.extra_modules:
+            self.extra_modules['dead_relu_left'].logger = self.logger
+        if 'dead_relu_right' in self.extra_modules:
+            self.extra_modules['dead_relu_right'].logger = self.logger
+            
+        if 'trace_fim_train' in self.extra_modules:
+            self.extra_modules['trace_fim_train'].logger = self.logger
+        if 'trace_fim_test' in self.extra_modules:
+            self.extra_modules['trace_fim_test'].logger = self.logger
+            
+        if 'rank_left_train' in self.extra_modules:
+            self.extra_modules['rank_left_train'].logger = self.logger
+        if 'rank_right_train' in self.extra_modules:
+            self.extra_modules['rank_right_train'].logger = self.logger
+        if 'rank_left_test' in self.extra_modules:
+            self.extra_modules['rank_left_test'].logger = self.logger
+        if 'rank_right_test' in self.extra_modules:
+            self.extra_modules['rank_right_test'].logger = self.logger
+            
+            
             
             
     def run_epoch(self, phase, config):
@@ -254,6 +270,16 @@ class TrainerClassification:
                             leave=False, position=1, total=loader_size, colour='red', disable=config.whether_disable_tqdm)
         self.global_step = self.epoch * loader_size
         
+        if self.epoch < 20:
+            config.stiffness_multi = loader_size * 5
+            config.rank_multi = loader_size * 5
+        elif self.epoch < 40:
+            config.stiffness_multi = loader_size * 10
+            config.rank_multi = loader_size * 10
+        else:
+            config.stiffness_multi = loader_size * 20
+            config.rank_multi = loader_size * 20
+        
         
         # ════════════════════════ training / inference ════════════════════════ #
         
@@ -261,11 +287,17 @@ class TrainerClassification:
         for i, data in enumerate(progress_bar):
             (x_true1, x_true2), y_true = data
             x_true1, x_true2, y_true = x_true1.to(self.device), x_true2.to(self.device), y_true.to(self.device)
+            if self.extra_modules['dead_relu_left']:
+                self.extra_modules['dead_relu_left'].enable()
+                self.extra_modules['dead_relu_right'].enable()
             y_pred = self.model(x_true1, x_true2, 
                                 left_branch_intervention=config.extra['left_branch_intervention'],
                                 right_branch_intervention=config.extra['right_branch_intervention'],
                                 enable_left_branch=config.extra['enable_left_branch'],
                                 enable_right_branch=config.extra['enable_right_branch'])
+            if self.extra_modules['dead_relu_left']:
+                self.extra_modules['dead_relu_left'].disable()
+                self.extra_modules['dead_relu_right'].disable()
             loss, evaluators = self.criterion(y_pred, y_true)
             step_assets = {
                 'evaluators': evaluators,
@@ -289,8 +321,39 @@ class TrainerClassification:
                     
                 self.optim.zero_grad(set_to_none=True)
                 
-                if self.extra_modules['trace_fim'] is not None and config.fim_trace_multi and self.global_step % config.fim_trace_multi == 0:
-                    self.extra_modules['trace_fim'](self.global_step, config, kind=config.kind)
+                
+                    
+                if self.extra_modules['trace_fim_train'] is not None and config.fim_trace_multi and self.global_step % config.fim_trace_multi == 0:
+                    self.extra_modules['trace_fim_train'](self.global_step, config, kind=config.kind)
+                    
+                if self.extra_modules['trace_fim_test'] is not None and config.fim_trace_multi and self.global_step % config.fim_trace_multi == 0:
+                    self.extra_modules['trace_fim_test'](self.global_step, config, kind=config.kind)
+                    
+                if self.extra_modules['stiffness_train'] is not None and config.stiffness_multi and self.global_step % config.stiffness_multi == 0:
+                    self.extra_modules['stiffness_train'](self.global_step, config, scope='periodic', phase='train', kind=config.kind)
+                    
+                if self.extra_modules['stiffness_test'] is not None and config.stiffness_multi and self.global_step % config.stiffness_multi == 0:
+                    self.extra_modules['stiffness_test'](self.global_step, config, scope='periodic', phase='test', kind=config.kind)
+                    
+                if self.extra_modules['rank_left_train'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
+                    self.extra_modules['rank_left_train'].enable()
+                    self.extra_modules['rank_left_train'].analysis(self.global_step, scope='periodic', phase='train', kind=config.kind)
+                    self.extra_modules['rank_left_train'].disable()
+                    
+                if self.extra_modules['rank_right_train'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
+                    self.extra_modules['rank_right_train'].enable()
+                    self.extra_modules['rank_right_train'].analysis(self.global_step, scope='periodic', phase='train', kind=config.kind)
+                    self.extra_modules['rank_right_train'].disable()
+                    
+                if self.extra_modules['rank_left_test'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
+                    self.extra_modules['rank_left_test'].enable()
+                    self.extra_modules['rank_left_test'].analysis(self.global_step, scope='periodic', phase='test', kind=config.kind)
+                    self.extra_modules['rank_left_test'].disable()
+                    
+                if self.extra_modules['rank_right_test'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
+                    self.extra_modules['rank_right_test'].enable()
+                    self.extra_modules['rank_right_test'].analysis(self.global_step, scope='periodic', phase='test', kind=config.kind)
+                    self.extra_modules['rank_right_test'].disable()
             
             
             # ════════════════════════ logging ════════════════════════ #
@@ -313,6 +376,11 @@ class TrainerClassification:
                 self.log(epoch_assets, phase, 'epoch', progress_bar, self.epoch)
 
             self.global_step += 1
+            
+        if self.extra_modules['dead_relu_left']:
+            self.extra_modules['dead_relu_left'].at_the_epoch_end(phase, epoch_assets['denom'], self.epoch)
+            self.extra_modules['dead_relu_right'].at_the_epoch_end(phase, epoch_assets['denom'], self.epoch)
+            
 
 
     def log(self, assets: Dict, phase: str, scope: str, progress_bar: tqdm, step: int):

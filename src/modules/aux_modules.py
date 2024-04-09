@@ -3,15 +3,14 @@ from copy import deepcopy
 
 import torch
 from torch.distributions import Categorical
+from torch.func import functional_call, vmap, grad
 
+from src.modules.aux_modules_collapse import variance_eucl
 from src.utils import prepare
 from src.utils.utils_optim import get_every_but_forbidden_parameter_names, FORBIDDEN_LAYER_TYPES
 
-from torch.func import functional_call, vmap, grad
-
-
 class TraceFIM(torch.nn.Module): #OverheadPrevention
-    def __init__(self, held_out, model, num_classes):
+    def __init__(self, held_out, model, num_classes, postfix, m_sampling=1):
         super().__init__()
         self.device = next(model.parameters()).device
         self.held_out_proper_x_left = held_out['proper_x_left']
@@ -25,6 +24,8 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
         print("\n penalized parameter names TFIM: ", self.penalized_parameter_names, '\n')
         self.labels = torch.arange(num_classes).to(self.device)
         self.logger = None
+        self.postfix = postfix
+        self.m_sampling = m_sampling
         
     def compute_loss(self, params, buffers, config, sample):
         batch0 = sample[0].unsqueeze(0)
@@ -59,17 +60,6 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
         params2 = {n: p for n, p in params.items() if 'right_branch' in n}
         params3 = {n: p for n, p in params.items() if 'main_branch' in n}
         buffers = {}
-        ft_per_sample_grads1 = self.ft_criterion(params1, buffers, config, (x_true1, x_true2))
-        ft_per_sample_grads1 = {k1: v.detach().data for k1, v in ft_per_sample_grads1.items()}
-        ft_per_sample_grads2 = self.ft_criterion(params2, buffers, config, (x_true1, x_true2))
-        ft_per_sample_grads2 = {k1: v.detach().data for k1, v in ft_per_sample_grads2.items()}
-        ft_per_sample_grads3 = {}
-        # ft_per_sample_grads3 = self.ft_criterion(params3, buffers, config, (x_true1, x_true2))
-        # ft_per_sample_grads3 = {k1: v.detach().data for k1, v in ft_per_sample_grads3.items()}
-        ft_per_sample_grads = ft_per_sample_grads1 | ft_per_sample_grads2 | ft_per_sample_grads3
-        params_names1 = [n for n, _ in params1.items()]
-        params_names2 = [n for n, _ in params2.items()]
-        params_names3 = [n for n, _ in params3.items()]
         evaluators = defaultdict(float)
         overall_trace = 0.0
         overall_trace1_bias = 0.0
@@ -78,55 +68,67 @@ class TraceFIM(torch.nn.Module): #OverheadPrevention
         overall_trace2_weight = 0.0
         overall_trace3_bias = 0.0
         overall_trace3_weight = 0.0
-        for param_name in ft_per_sample_grads:
-            trace_p = ft_per_sample_grads[param_name].mean()          
-            evaluators[f'trace_fim_{kind}/{param_name}'] += trace_p.item()
-            if param_name in self.penalized_parameter_names:
-                # overall_trace += trace_p.item()
-                if param_name in params_names1:
-                    if 'bias' in param_name:
-                        overall_trace1_bias += trace_p.item()
-                    elif 'weight' in param_name:
-                        overall_trace1_weight += trace_p.item()
-                    else:
-                        raise ValueError("The parameters are neither biases nor weights.")
-                elif param_name in params_names2:
-                    if 'bias' in param_name:
-                        overall_trace2_bias += trace_p.item()
-                    elif 'weight' in param_name:
-                        overall_trace2_weight += trace_p.item()
-                    else:
-                        raise ValueError("The parameters are neither biases nor weights.")
-                elif param_name in params_names3:
-                    if 'bias' in param_name:
-                        overall_trace3_bias += trace_p.item()
-                    elif 'weight' in param_name:
-                        overall_trace3_weight += trace_p.item()
-                    else:
-                        raise ValueError("The parameters are neither biases nor weights.")
+        for _ in range(self.m_sampling):
+            ft_per_sample_grads1 = self.ft_criterion(params1, buffers, config, (x_true1, x_true2))
+            ft_per_sample_grads1 = {k1: v.detach().data for k1, v in ft_per_sample_grads1.items()}
+            ft_per_sample_grads2 = self.ft_criterion(params2, buffers, config, (x_true1, x_true2))
+            ft_per_sample_grads2 = {k1: v.detach().data for k1, v in ft_per_sample_grads2.items()}
+            ft_per_sample_grads3 = {}
+            # ft_per_sample_grads3 = self.ft_criterion(params3, buffers, config, (x_true1, x_true2))
+            # ft_per_sample_grads3 = {k1: v.detach().data for k1, v in ft_per_sample_grads3.items()}
+            ft_per_sample_grads = ft_per_sample_grads1 | ft_per_sample_grads2 | ft_per_sample_grads3
+            params_names1 = [n for n, _ in params1.items()]
+            params_names2 = [n for n, _ in params2.items()]
+            params_names3 = [n for n, _ in params3.items()]
+            for param_name in ft_per_sample_grads:
+                trace_p = ft_per_sample_grads[param_name].mean()          
+                evaluators[f'trace_fim_{self.postfix}_{kind}/{param_name}'] += trace_p.item() / self.m_sampling
+                if param_name in self.penalized_parameter_names:
+                    # overall_trace += trace_p.item()
+                    if param_name in params_names1:
+                        if 'bias' in param_name:
+                            overall_trace1_bias += trace_p.item() / self.m_sampling
+                        elif 'weight' in param_name:
+                            overall_trace1_weight += trace_p.item() / self.m_sampling
+                        else:
+                            raise ValueError("The parameters are neither biases nor weights.")
+                    elif param_name in params_names2:
+                        if 'bias' in param_name:
+                            overall_trace2_bias += trace_p.item() / self.m_sampling
+                        elif 'weight' in param_name:
+                            overall_trace2_weight += trace_p.item() / self.m_sampling
+                        else:
+                            raise ValueError("The parameters are neither biases nor weights.")
+                    elif param_name in params_names3:
+                        if 'bias' in param_name:
+                            overall_trace3_bias += trace_p.item() / self.m_sampling
+                        elif 'weight' in param_name:
+                            overall_trace3_weight += trace_p.item() / self.m_sampling
+                        else:
+                            raise ValueError("The parameters are neither biases nor weights.")
         
-        evaluators[f'trace_fim_overall/{kind}_trace_bias'] = overall_trace1_bias + overall_trace2_bias + overall_trace3_bias
-        evaluators[f'trace_fim_overall/{kind}_trace_weight'] = overall_trace1_weight + overall_trace2_weight + overall_trace3_weight
-        evaluators[f'trace_fim_overall/{kind}_trace'] = evaluators[f'trace_fim_overall/{kind}_trace_bias'] + evaluators[f'trace_fim_overall/{kind}_trace_weight']
+        # evaluators[f'trace_fim_overall/{kind}_trace_bias'] = overall_trace1_bias + overall_trace2_bias + overall_trace3_bias
+        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace_weight'] = overall_trace1_weight + overall_trace2_weight + overall_trace3_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace'] = evaluators[f'trace_fim_overall/{kind}_trace_bias'] + evaluators[f'trace_fim_overall/{kind}_trace_weight']
         
-        evaluators[f'trace_fim_overall/{kind}_trace1_bias'] = overall_trace1_bias
-        evaluators[f'trace_fim_overall/{kind}_trace1_weight'] = overall_trace1_weight
-        evaluators[f'trace_fim_overall/{kind}_trace1'] = overall_trace1_bias + overall_trace1_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace1_bias'] = overall_trace1_bias
+        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace1_weight'] = overall_trace1_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace1'] = overall_trace1_bias + overall_trace1_weight
         
-        evaluators[f'trace_fim_overall/{kind}_trace2_bias'] = overall_trace2_bias
-        evaluators[f'trace_fim_overall/{kind}_trace2_weight'] = overall_trace2_weight
-        evaluators[f'trace_fim_overall/{kind}_trace2'] = overall_trace2_bias + overall_trace2_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace2_bias'] = overall_trace2_bias
+        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace2_weight'] = overall_trace2_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace2'] = overall_trace2_bias + overall_trace2_weight
         
-        evaluators[f'trace_fim_overall/{kind}_trace3_bias'] = overall_trace3_bias
-        evaluators[f'trace_fim_overall/{kind}_trace3_weight'] = overall_trace3_weight
-        evaluators[f'trace_fim_overall/{kind}_trace3'] = overall_trace3_bias + overall_trace3_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace3_bias'] = overall_trace3_bias
+        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace3_weight'] = overall_trace3_weight
+        # evaluators[f'trace_fim_overall/{kind}_trace3'] = overall_trace3_bias + overall_trace3_weight
         
-        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_bias'] = overall_trace1_bias / (overall_trace2_bias + 1e-10)
-        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_weight'] = overall_trace1_weight / (overall_trace2_weight + 1e-10)
-        evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right'] = (overall_trace1_bias + overall_trace1_weight) / (overall_trace2_bias + overall_trace2_weight + 1e-10)
+        # evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_bias'] = overall_trace1_bias / (overall_trace2_bias + 1e-10)
+        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_ratio_left_to_right_weight'] = overall_trace1_weight / (overall_trace2_weight + 1e-10)
+        # evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right'] = (overall_trace1_bias + overall_trace1_weight) / (overall_trace2_bias + overall_trace2_weight + 1e-10)
         # evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
         # evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
-        evaluators['steps/trace_fim'] = global_step
+        evaluators[f'steps/trace_fim_{self.postfix}'] = global_step
         self.model.train()
         self.logger.log_scalars(evaluators, global_step)    
         
@@ -358,3 +360,231 @@ class TraceFIMB(torch.nn.Module):
         evaluators['steps/trace_fim'] = step
         self.logger.log_scalars(evaluators, step)       
 
+
+import os
+from abc import abstractmethod
+import matplotlib.pyplot as plt
+import numpy as np
+class BaseAnalysis:
+    def export(self, name):
+        torch.save(self.result, os.path.join(self.rpath, name + ".pt"))
+
+    def clean_up(self):
+        for attr in self.attributes_on_gpu:
+            try:
+                a = getattr(self, attr)
+                a.to("cpu")
+                del a
+            except AttributeError:
+                pass
+        del self
+        torch.cuda.empty_cache()
+
+    @abstractmethod
+    def analysis(self):
+        pass
+
+    @abstractmethod
+    def plot(self, path):
+        pass
+
+
+class RepresentationsSpectra(BaseAnalysis):
+    # macierz grama czy macierz kowariancji?
+    def __init__(self, model, loaders, modules_list, is_left_branch, layers=None, rpath='.', MAX_REPR_SIZE=8000):
+        self.model = model
+        self.loaders = loaders
+        self.names_of_layers_to_analyze = layers if layers is not None else [n for n, _ in model.named_modules()]
+        self.modules_list = modules_list
+        self.handels = []
+        self._insert_hooks()
+        self.representations = {}
+        self.MAX_REPR_SIZE = MAX_REPR_SIZE
+        self.rpath = rpath
+        # os.makedirs(self.rpath, exist_ok=True)
+        self.attributes_on_gpu = ["model"]
+        self.logger = None
+        self.is_able = False
+        self.device = next(model.parameters()).device
+        self.is_left_branch = is_left_branch
+        self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
+        self.subsampling = {}
+
+    def _spectra_hook(self, name):
+        def spectra_hook(model, input, output):
+            if self.is_able:
+                output = output.flatten(start_dim=1)
+                representation_size = output.shape[1]
+                if name in self.subsampling:  # czy da się lepiej? Spytać Staszka. #TODO
+                    output = torch.index_select(output, 1, self.subsampling[name].to(self.device))
+                elif representation_size > self.MAX_REPR_SIZE:
+                    self.subsampling[name] = torch.randperm(representation_size)[:self.MAX_REPR_SIZE].sort()[0]
+                    output = torch.index_select(output, 1, self.subsampling[name].to(self.device))
+                
+                self.representations[name] = self.representations.get(name, []) + [output]
+        return spectra_hook
+
+    def _insert_hooks(self):
+        for name, module in self.model.named_modules():
+            if name in self.names_of_layers_to_analyze:
+                if any(isinstance(module, module_type) for module_type in self.modules_list):
+                    self.handels.append(module.register_forward_hook(self._spectra_hook(name)))
+                
+    def disable(self):
+        self.is_able = False
+        
+    def enable(self):
+        self.is_able = True
+
+    @torch.no_grad()
+    def collect_representations(self, kind, phase):
+        self.model.eval()
+        y_true = torch.empty((0,))
+        with torch.no_grad():
+            phase = f'{phase}_proper' if kind == 'proper' else f'{phase}_blurred'
+            for data, y_data in self.loaders[phase]:
+                x_true = data[0] if self.is_left_branch else data[1]
+                x_true = x_true.to(self.device)
+                _ = self.model(x_true)
+                y_true = torch.cat((y_true, y_data))
+        for name, rep in self.representations.items():
+            self.representations[name] = torch.cat(rep, dim=0).detach()
+        self.model.train()
+        return y_true
+    
+    def collect_weights(self):
+        named_weights = {n: p.reshape(p.size(0), -1) for n, p in self.model.named_parameters() if 'weight' in n and n in self.penalized_parameter_names}
+        return named_weights
+
+    def analysis(self, step, scope, phase, kind):
+        main_prefix = f'ranks_representations_{"left" if self.is_left_branch else "right"}_branch_{phase}'
+        postfix = f'____{scope}____{phase}'
+        y_true = self.collect_representations(kind, phase)
+        
+        prefix = main_prefix
+        evaluators1 = {}
+        for name, rep in self.representations.items():  # internal representations
+            name_dict = f'{prefix}/{name}{postfix}'
+            rep = torch.cov(rep.T)
+            # rep = rep.T @ rep
+            rank = torch.linalg.matrix_rank(rep).item()
+            evaluators1[name_dict] = rank
+            
+        self.plot(evaluators1, prefix, postfix)
+        
+        prefix = f'square_stable_{main_prefix}'
+        evaluators2 = {}
+        for name, rep in self.representations.items():  # internal representations
+            name_dict = f'{prefix}/{name}{postfix}'
+            rep = torch.cov(rep.T)
+            singular_squared = torch.linalg.eig(rep)[0].float()
+            square_stable_rank = singular_squared.sum() / max(singular_squared)
+            evaluators2[name_dict] = square_stable_rank.item()
+            
+        self.plot(evaluators2, prefix, postfix)
+        
+        evaluators = evaluators1 | evaluators2
+        
+        variance_eucl(self.representations, y_true, evaluators, label="left" if self.is_left_branch else "right", phase=phase)  # da sie zastosować square stable rank tutaj?
+        
+        if phase == 'train':
+            main_prefix = f'ranks_weights_{"left" if self.is_left_branch else "right"}_branch'
+            postfix = f'____{scope}____{phase}'
+            named_weights = self.collect_weights()
+            
+            prefix = main_prefix
+            evaluators3 = {}
+            for name, weights in named_weights.items():     # weights
+                name_dict = f'{prefix}/{name}{postfix}'
+                weights = torch.cov(weights)
+                # weights = weights @ weights.T
+                evaluators3[name_dict] = torch.linalg.matrix_rank(weights).item()
+                
+            self.plot(evaluators3, prefix, postfix)
+            
+            prefix = f'square_stable_{main_prefix}'
+            evaluators4 = {}
+            for name, weights in named_weights.items():     # weights
+                name_dict = f'{prefix}/{name}{postfix}'
+                weights = torch.cov(weights)
+                singular_squared = torch.linalg.eig(weights)[0].float()
+                square_stable_rank = singular_squared.sum() / max(singular_squared)
+                evaluators4[name_dict] = square_stable_rank.item()
+                
+            self.plot(evaluators4, prefix, postfix)
+            
+            evaluators = evaluators | evaluators3 | evaluators4
+
+        
+        evaluators[f'steps/ranks_{"left" if self.is_left_branch else "right"}_{phase}'] = step
+        self.logger.log_scalars(evaluators, step)
+        self.representations = {}
+        self.subsampling = {}
+        torch.cuda.empty_cache()
+        # self.clean_up()
+
+    def plot(self, evaluators, prefix, postfix):
+        plot_name = f'{prefix}_plots/{postfix}'
+        fig, axs = plt.subplots(1, 1, figsize=(10, 10))
+        axs.plot(list(range(len(evaluators))), list(evaluators.values()), "o-")
+        # print(list(evaluators.keys()))
+        # Dodawanie tytułu i etykiet osi
+        axs.set_title("Rank Across Layers")  # Dodaj tytuł wykresu
+        axs.set_xlabel("Layer")  # Dodaj etykietę dla osi X
+        axs.set_ylabel("Rank")  # Dodaj etykietę dla osi Y
+        plot_images = {plot_name: fig}
+        self.logger.log_plots(plot_images)
+        # plt.savefig(os.path.join(self.rpath, name + ".png"), dpi=500)
+        plt.close()
+        
+        
+        
+        
+class DeadReLU:
+    '''
+    Gather dead activations
+    '''
+    def __init__(self, model, is_left_branch, is_able):
+        self.model = model
+        self.dead_acts = defaultdict(int)
+        self.denoms = defaultdict(int)
+        self.modules_list = [torch.nn.ReLU, torch.nn.LeakyReLU, torch.nn.GELU]
+        self.is_able = is_able
+        self.nb_of_dead_relu = {}
+        self.handels = []
+        self.logger = None
+        self._insert_hooks()
+        self.is_left_branch = is_left_branch
+        
+    def disable(self):
+        self.is_able = False
+        
+    def enable(self):
+        self.is_able = True
+        
+    def _deadrelu_hook(self, name):
+        def deadrelu_hook(model, input, output):
+            if self.is_able:
+                output = output.flatten(start_dim=1)  # (N, D), D - liczba jednostek w reprezentacji, pojedyńcze skalary
+                output = (output <= 0).sum(axis=0)  # (D, )
+                if name not in self.nb_of_dead_relu:
+                    self.nb_of_dead_relu[name] = output
+                else:
+                    self.nb_of_dead_relu[name] += output
+        return deadrelu_hook
+
+    def _insert_hooks(self):
+        for name, module in self.model.named_modules():
+            if any(isinstance(module, module_type) for module_type in self.modules_list):
+                self.handels.append(module.register_forward_hook(self._deadrelu_hook(name)))
+                    
+    def at_the_epoch_end(self, phase, max_dataset, step):
+        number = sum([(self.nb_of_dead_relu[name] == max_dataset).sum() for name in self.nb_of_dead_relu]) / sum([self.nb_of_dead_relu[name].shape[0] for name in self.nb_of_dead_relu])
+        evaluators = {f'nb_of_dead_relu_units_{"left" if self.is_left_branch else "right"}_branch/overall_frac____epoch____{phase}': number}
+        numbers = [(self.nb_of_dead_relu[name] == max_dataset).float().mean() for name in self.nb_of_dead_relu]
+        for i, name in enumerate(self.nb_of_dead_relu):
+            evaluators[f'nb_of_dead_relu_units_{"left" if self.is_left_branch else "right"}_branch/{name}_frac____epoch____{phase}'] = numbers[i]
+        evaluators[f'steps/dead_relu_{"left" if self.is_left_branch else "right"}'] = step
+        self.logger.log_scalars(evaluators, step)
+        self.nb_of_dead_relu = {}
+        torch.cuda.empty_cache()

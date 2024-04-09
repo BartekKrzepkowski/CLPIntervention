@@ -25,10 +25,12 @@ class DualAugmentDataset(Dataset):
     
 import math
 class SplitAndAugmentDataset(Dataset):
-    def __init__(self, dataset, transform1, transform2, overlap=0.5, is_train=True, reverse=True):
+    def __init__(self, dataset, transform1, transform2, transform3=None, subset=tuple(), overlap=0.5, is_train=True, reverse=True):
         self.dataset = dataset
         self.transform1 = transform1
         self.transform2 = transform2
+        self.transform3 = transform3
+        self.subset = subset
         self.with_overlap = overlap / 2 + 0.5
         self.is_train = is_train
         self.reverse = reverse
@@ -51,6 +53,9 @@ class SplitAndAugmentDataset(Dataset):
         image2 = image.crop((width-width_, 0, width, height))
 
         image1 = self.transform1(image1)
-        image2 = self.transform2(image2)
+        if self.is_train and self.subset is not None and idx in self.subset:  # czy podczas treningu prawe wejście nie zostanie rozmazane
+            image2 = self.transform3(image2)
+        else:
+            image2 = self.transform2(image2)
 
         return (image1, image2), label
