@@ -13,6 +13,8 @@ class BasicBlock(BasicBlock):
     def __init__(self, *args, **kwargs):
         self.skips = kwargs.pop("skips")
         super().__init__(*args, **kwargs)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x: Tensor) -> Tensor:
         if self.skips:
@@ -20,7 +22,7 @@ class BasicBlock(BasicBlock):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -30,7 +32,7 @@ class BasicBlock(BasicBlock):
 
         if self.skips:
             out += identity
-        out = self.relu(out)
+        out = self.relu2(out)
 
         return out
 
@@ -39,6 +41,9 @@ class Bottleneck(Bottleneck):
     def __init__(self, *args, **kwargs):
         self.skips = kwargs.pop("skips", True)
         super().__init__(*args, **kwargs)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.relu3 = nn.ReLU(inplace=True)
 
     def forward(self, x: Tensor) -> Tensor:
         if self.skips:
@@ -46,11 +51,11 @@ class Bottleneck(Bottleneck):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.relu2(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -60,7 +65,7 @@ class Bottleneck(Bottleneck):
 
         if self.skips:
             out += identity
-        out = self.relu(out)
+        out = self.relu3(out)
 
         return out
 
@@ -134,7 +139,7 @@ class ResNet(nn.Module):
                                   self._make_layer(block, 64, layers[0]),
                                   self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]))
 
-        z = torch.randn(1, 3, img_height, ceil(img_width * (overlap / 2 + 0.5)))
+        z = torch.randn(1, 3, img_height, img_width)
         # z = self.left_branch(z)
         # _, self.channels_out, self.height, self.width = z.shape
         self.channels_out, self.height, self.width, pre_mlp_channels = infer_dims_from_blocks(self.left_branch, z, scaling_factor=self.scaling_factor)
@@ -258,7 +263,7 @@ class ResNet(nn.Module):
 def build_mm_resnet(num_classes, input_channels, img_height, img_width, overlap, backbone_type, batchnorm_layers, modify_resnet, only_features, skips, wheter_concate, width_scale):
 
     resnet = partial(
-        ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate
+        ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate, img_height=img_height, img_width=img_width
     )
     if not batchnorm_layers:
         resnet = partial(resnet, norm_layer=nn.Identity)

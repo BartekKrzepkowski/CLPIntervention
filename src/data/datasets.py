@@ -73,11 +73,12 @@ def get_mm_svhn(dataset_path=None, overlap=0.0, resize_factor=1/4):
     return train_dual_augment_dataset, test_proper_dual_augment_dataset, test_blurred_dual_augment_dataset
 
 
-def get_mm_cifar10(dataset_path=None, overlap=0.0, resize_factor=1/4):
+def get_mm_cifar10(dataset_path=None, overlap=0.0, resize_factor=1/4, subset=None):
     dataset_path = dataset_path if dataset_path is not None else os.environ['CIFAR10_PATH']
     
     train_dataset = datasets.CIFAR10(dataset_path, train=True, download=True)
-    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_cifar10.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_cifar10.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), overlap=overlap, is_train=True)
+    train_dual_augment_dataset = SplitAndAugmentDataset(train_dataset, transforms_cifar10.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'left'), transforms_cifar10.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'), transform3=transforms_cifar10.TRANSFORMS_NAME_MAP['transform_train_proper'](overlap, 'right'),
+                                                        subset=subset, overlap=overlap, is_train=True)
     
     test_proper_dataset = datasets.CIFAR10(dataset_path, train=False, download=True)
     test_proper_dual_augment_dataset = SplitAndAugmentDataset(test_proper_dataset, transforms_cifar10.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'left'), transforms_cifar10.TRANSFORMS_NAME_MAP['transform_eval_proper'](overlap, 'right'), overlap=overlap, is_train=False)
@@ -105,7 +106,7 @@ def get_tinyimagenet(proper_normalization=True):
         transforms.RandomCrop(64, padding=8),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
-        transforms.RandomErasing(p=0.1),
+        # transforms.RandomErasing(p=0.1),
     ])
     train_data = datasets.ImageFolder(train_path, transform=transform_train)
     train_eval_data = datasets.ImageFolder(train_path, transform=transform_eval)

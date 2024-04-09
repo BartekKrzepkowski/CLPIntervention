@@ -6,7 +6,7 @@ from src.modules.architectures.mm_effnetv2 import MMEffNetV2S, ResNet18PyTorch, 
 from src.modules.architectures.mm_mlp import MMMLPwithNorm
 from src.modules.architectures.mm_resnets import build_mm_resnet
 from src.modules.architectures.models import MMSimpleCNN
-from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss
+from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss, BalancePenaltyLoss
 from src.visualization.clearml_logger import ClearMLLogger
 from src.visualization.tensorboard_pytorch import TensorboardPyTorch
 from src.visualization.wandb_logger import WandbLogger
@@ -39,6 +39,7 @@ LOGGERS_NAME_MAP = {
 }
 
 LOSS_NAME_MAP = {
+    'balance_loss': BalancePenaltyLoss,
     'ce': torch.nn.CrossEntropyLoss,
     'cls': ClassificationLoss,
     'fp': FisherPenaltyLoss,

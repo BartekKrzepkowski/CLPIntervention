@@ -3,7 +3,7 @@ import math
 import torch
 
 from src.modules.metrics import acc_metric
-from src.modules.regularizers import FisherPenaly
+from src.modules.regularizers import BalancePenaly, FisherPenaly
 from src.utils import common
 
 
@@ -39,7 +39,7 @@ class MSESoftmaxLoss(torch.nn.Module):
 class FisherPenaltyLoss(torch.nn.Module):
     def __init__(self, model, general_criterion_name, num_classes, whether_record_trace=False, fpw=0.0):
         super().__init__()
-        self.criterion = ClassificationLoss(common.LOSS_NAME_MAP[general_criterion_name]())
+        self.criterion = ClassificationLoss(general_criterion_name)
         self.regularizer = FisherPenaly(model, common.LOSS_NAME_MAP[general_criterion_name](), num_classes)
         self.whether_record_trace = whether_record_trace
         self.fpw = fpw
@@ -56,4 +56,28 @@ class FisherPenaltyLoss(torch.nn.Module):
             if self.fpw > 0:
                 loss += self.fpw * overall_trace
         return loss, evaluators, traces
+    
+    
+class BalancePenaltyLoss(torch.nn.Module):
+    def __init__(self, model, general_criterion_name, num_classes, weight=None, fpw=0.0, use_log=False):
+        super().__init__()
+        self.criterion = ClassificationLoss(general_criterion_name)
+        self.regularizer = BalancePenaly(model, common.LOSS_NAME_MAP[general_criterion_name](weight=weight), num_classes)
+        self.fpw = fpw
+        self.use_log = use_log
+        print("Use log: ", use_log)
+        #przygotowanie do logowania co n kroków
+        self.overall_trace_buffer = None
+        self.traces = None
+
+    def forward(self, y_pred, y_true):
+        loss, evaluators = self.criterion(y_pred, y_true)
+        mean_ratio, sum_of_fims, traces = self.regularizer(y_pred)
+        evaluators['balance_penalty/mean_ratio'] = mean_ratio.item()
+        evaluators = evaluators | traces
+        if self.fpw > 0:
+            reg_part = torch.log(mean_ratio) if self.use_log else (mean_ratio - 1)
+            loss += self.fpw * (reg_part - sum_of_fims)
+            evaluators['balance_penalty/combined_loss'] = loss.item()
+        return loss, evaluators
     

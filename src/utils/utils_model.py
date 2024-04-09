@@ -39,3 +39,10 @@ def infer_dims_from_blocks(blocks, x, scaling_factor):
 def load_model_specific_params(model_name):
     model_params = json.load(open(f'src/configs/{model_name}.json', 'r'))
     return model_params
+
+def change_activation(model, old_activation, new_activation):
+    for name, module in model.named_children():
+        if isinstance(module, old_activation):
+            setattr(model, name, new_activation())
+        else:
+            change_activation(module, old_activation, new_activation)

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torchvision import datasets
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import Subset, DataLoader
 
 
 def count_classes(dataset):
@@ -67,5 +67,11 @@ def get_mean_std_4(dataset):
     train_mean = np.mean(x, axis=(0, 2, 3))
     train_std = np.std(x, axis=(0, 2, 3))
     return train_mean, train_std
+
+
+
+def create_dataloader(dataset, indices, loader_params):
+    subset = Subset(dataset, indices)
+    return DataLoader(subset, shuffle=False, **loader_params)
 
 

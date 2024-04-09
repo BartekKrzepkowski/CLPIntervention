@@ -1,0 +1,6 @@
+{
+    "general_criterion_name": "ce",
+    "num_classes": 10,
+    "fpw": 1e-1,
+    "use_log": true
+}
