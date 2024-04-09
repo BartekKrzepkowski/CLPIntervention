@@ -222,6 +222,7 @@ if __name__ == "__main__":
             handlers=[logging.StreamHandler()],
             force=True,
         )
-    logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={phase1}, phase2={conf.phase2} phase3={conf.phase3}.')
+    logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={conf.phase1}, phase2={conf.phase2} phase3={conf.phase3}.')
+    print(type(conf.phase1),type(conf.phase2),type(conf.phase3))
     
     objective('phase3', conf.model_name, conf.dataset_name, conf.lr, conf.wd, conf.phase1, conf.phase2, conf.phase3, conf.model_checkpoint)

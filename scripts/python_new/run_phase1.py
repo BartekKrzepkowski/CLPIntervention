@@ -137,7 +137,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1):
     
     
     extra_modules = defaultdict(lambda: None)
-    # extra_modules['run_stats'] = RunStatsBiModal(model, optim)
+    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
     # extra_modules['trace_fim'] = TraceFIM(held_out, model, num_classes=num_classes)
     
     
