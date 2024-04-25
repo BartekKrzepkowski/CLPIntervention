@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 
 from src.modules.aux_modules import TraceFIM
 from src.modules.metrics import RunStatsBiModal
-from src.trainer.trainer_classification_mm_clp import TrainerClassification
+from src.trainer.trainer_classification_mm_clp_umt import TrainerClassification
 from src.utils.prepare import prepare_criterion, prepare_loaders_clp, prepare_model, prepare_optim_and_scheduler
 from src.utils.utils_criterion import get_samples_weights
 from src.utils.utils_data import count_classes
@@ -29,7 +29,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1):
 
     BATCH_SIZE = 125
     CLIP_VALUE = 0.0
-    LOGS_PER_EPOCH = 0  # 0 means each batch
+    LOGS_PER_EPOCH = 0  # 0 means every batch
     LR_LAMBDA = 1.0
     NUM_WORKERS = 12
     OVERLAP = 0.0

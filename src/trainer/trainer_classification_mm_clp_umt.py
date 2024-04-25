@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Dict
 
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm, trange
 
 from src.data.transforms import TRANSFORMS_BLURRED_RIGHT_NAME_MAP, TRANSFORMS_PROPER_RIGHT_NAME_MAP
@@ -21,6 +22,7 @@ class TrainerClassification:
         self.optim = optim
         self.lr_scheduler = lr_scheduler
         self.device = device
+        self.mse_loss = torch.nn.MSELoss()
 
         self.logger = None
         self.base_path = None
@@ -277,32 +279,11 @@ class TrainerClassification:
         
         if 'run_stats' in self.extra_modules:
             self.extra_modules['run_stats'].logger = self.logger
-        if 'stiffness_train' in self.extra_modules:
-            self.extra_modules['stiffness_train'].logger = self.logger
-        if 'stiffness_test' in self.extra_modules:
-            self.extra_modules['stiffness_test'].logger = self.logger
-            
-        if 'dead_relu_left' in self.extra_modules:
-            self.extra_modules['dead_relu_left'].logger = self.logger
-        if 'dead_relu_right' in self.extra_modules:
-            self.extra_modules['dead_relu_right'].logger = self.logger
-            
         if 'trace_fim_train' in self.extra_modules:
             self.extra_modules['trace_fim_train'].logger = self.logger
         if 'trace_fim_test' in self.extra_modules:
             self.extra_modules['trace_fim_test'].logger = self.logger
-            
-        if 'rank_left_train' in self.extra_modules:
-            self.extra_modules['rank_left_train'].logger = self.logger
-        if 'rank_right_train' in self.extra_modules:
-            self.extra_modules['rank_right_train'].logger = self.logger
-        if 'rank_left_test' in self.extra_modules:
-            self.extra_modules['rank_left_test'].logger = self.logger
-        if 'rank_right_test' in self.extra_modules:
-            self.extra_modules['rank_right_test'].logger = self.logger
-            
-            
-            
+
             
     def run_epoch(self, phase, config):
         """
@@ -343,18 +324,28 @@ class TrainerClassification:
         for i, data in enumerate(progress_bar):
             (x_true1, x_true2), y_true = data
             x_true1, x_true2, y_true = x_true1.to(self.device), x_true2.to(self.device), y_true.to(self.device)
-            if self.extra_modules['dead_relu_left']:
-                self.extra_modules['dead_relu_left'].enable()
-                self.extra_modules['dead_relu_right'].enable()
-            y_pred = self.model(x_true1, x_true2, 
+            y_pred, f_left_modality, f_right_modality = self.model(x_true1, x_true2, 
                                 left_branch_intervention=config.extra['left_branch_intervention'],
                                 right_branch_intervention=config.extra['right_branch_intervention'],
                                 enable_left_branch=config.extra['enable_left_branch'],
                                 enable_right_branch=config.extra['enable_right_branch'])
-            if self.extra_modules['dead_relu_left']:
-                self.extra_modules['dead_relu_left'].disable()
-                self.extra_modules['dead_relu_right'].disable()
+            f_left_modality_pretrained = self.model.left_modality_pretrained(x_true1)
+            f_right_modality_pretrained = self.model.right_modality_pretrained(x_true2)
+            
+            #policz kullback div pomiędzy cechami z pretrained i z modelu
+            # kl_divergence1 = F.kl_div(F.log_softmax(f_left_modality.view(f_left_modality.shape[0], -1), dim=1), F.softmax(f_left_modality_pretrained.view(f_left_modality.shape[0], -1), dim=1), reduction='batchmean')
+            # kl_divergence2 = F.kl_div(F.log_softmax(f_right_modality.view(f_right_modality.shape[0], -1), dim=1), F.softmax(f_right_modality_pretrained.view(f_right_modality.shape[0], -1), dim=1), reduction='batchmean')
+            
             loss, evaluators = self.criterion(y_pred, y_true)
+            
+            mse_loss_pretrained1 = self.mse_loss(f_left_modality.view(f_left_modality.shape[0], -1), f_left_modality_pretrained.view(f_left_modality.shape[0], -1))
+            mse_loss_pretrained2 = self.mse_loss(f_right_modality.view(f_right_modality.shape[0], -1), f_right_modality_pretrained.view(f_right_modality.shape[0], -1))
+            
+            evaluators['mse_loss_pretrained1'] = mse_loss_pretrained1.item()
+            evaluators['mse_loss_pretrained2'] = mse_loss_pretrained2.item()
+            
+            loss += config.distill * (mse_loss_pretrained1 + mse_loss_pretrained2) # parametr do ustawienia ###TODO
+            
             step_assets = {
                 'evaluators': evaluators,
                 'denom': y_true.size(0),
@@ -377,39 +368,12 @@ class TrainerClassification:
                     
                 self.optim.zero_grad(set_to_none=True)
                 
-                
                     
                 if self.extra_modules['trace_fim_train'] is not None and config.fim_trace_multi and self.global_step % config.fim_trace_multi == 0:
                     self.extra_modules['trace_fim_train'](self.global_step, config, kind=config.kind)
                     
                 if self.extra_modules['trace_fim_test'] is not None and config.fim_trace_multi and self.global_step % config.fim_trace_multi == 0:
                     self.extra_modules['trace_fim_test'](self.global_step, config, kind=config.kind)
-                    
-                if self.extra_modules['stiffness_train'] is not None and config.stiffness_multi and self.global_step % config.stiffness_multi == 0:
-                    self.extra_modules['stiffness_train'](self.global_step, config, scope='periodic', phase='train', kind=config.kind)
-                    
-                if self.extra_modules['stiffness_test'] is not None and config.stiffness_multi and self.global_step % config.stiffness_multi == 0:
-                    self.extra_modules['stiffness_test'](self.global_step, config, scope='periodic', phase='test', kind=config.kind)
-                    
-                if self.extra_modules['rank_left_train'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
-                    self.extra_modules['rank_left_train'].enable()
-                    self.extra_modules['rank_left_train'].analysis(self.global_step, scope='periodic', phase='train', kind=config.kind)
-                    self.extra_modules['rank_left_train'].disable()
-                    
-                if self.extra_modules['rank_right_train'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
-                    self.extra_modules['rank_right_train'].enable()
-                    self.extra_modules['rank_right_train'].analysis(self.global_step, scope='periodic', phase='train', kind=config.kind)
-                    self.extra_modules['rank_right_train'].disable()
-                    
-                if self.extra_modules['rank_left_test'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
-                    self.extra_modules['rank_left_test'].enable()
-                    self.extra_modules['rank_left_test'].analysis(self.global_step, scope='periodic', phase='test', kind=config.kind)
-                    self.extra_modules['rank_left_test'].disable()
-                    
-                if self.extra_modules['rank_right_test'] is not None and config.rank_multi and self.global_step % config.rank_multi == 0:
-                    self.extra_modules['rank_right_test'].enable()
-                    self.extra_modules['rank_right_test'].analysis(self.global_step, scope='periodic', phase='test', kind=config.kind)
-                    self.extra_modules['rank_right_test'].disable()
             
             
             # ════════════════════════ logging ════════════════════════ #
@@ -432,12 +396,7 @@ class TrainerClassification:
                 self.log(epoch_assets, phase, 'epoch', progress_bar, self.epoch)
 
             self.global_step += 1
-            
-        if self.extra_modules['dead_relu_left']:
-            self.extra_modules['dead_relu_left'].at_the_epoch_end(phase, epoch_assets['denom'], self.epoch)
-            self.extra_modules['dead_relu_right'].at_the_epoch_end(phase, epoch_assets['denom'], self.epoch)
-            
-
+    
 
     def log(self, assets: Dict, phase: str, scope: str, progress_bar: tqdm, step: int):
         '''

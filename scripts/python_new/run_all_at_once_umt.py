@@ -16,15 +16,21 @@ from src.data.transforms import TRANSFORMS_BLURRED_RIGHT_NAME_MAP
 from src.modules.aux_modules import TraceFIM, RepresentationsSpectra, DeadReLU
 from src.modules.aux_modules_collapse import GradientsSpectralStiffness
 from src.modules.metrics import RunStatsBiModal
-from src.trainer.trainer_classification_mm_clp import TrainerClassification
+from src.trainer.trainer_classification_mm_clp_umt import TrainerClassification
 from src.utils.prepare import prepare_criterion, prepare_loaders_clp, prepare_model, prepare_optim_and_scheduler
 from src.utils.utils_criterion import get_samples_weights, load_criterion_specific_params
 from src.utils.utils_data import count_classes, create_dataloader
-from src.utils.utils_model import load_model_specific_params, change_activation
-from src.utils.utils_trainer import manual_seed
+from src.utils.utils_model import load_model_specific_params, change_activation, BiModalModelwithPretrainedBranches
+from src.utils.utils_trainer import manual_seed, load_model
 
 
-def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3, phase4):
+# TODO
+# 1. Specyficzny model z przetrenowanymi modalnościami
+# 2. Załaduj model, przetrenowane gałęzie, zamróź je
+# 3. nałóż wrapper na wszystkie modele
+
+
+def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3, phase4, left_branch_pretrained_path, right_branch_pretrained_path):
     # ════════════════════════ prepare general params ════════════════════════ #
 
 
@@ -81,7 +87,11 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
         **model_params
     }
     
-    model = prepare_model(type_names['model'], model_params=model_params).to(device)
+    model = prepare_model(type_names['model'], model_params=model_params)
+    model_pretrained = prepare_model(type_names['model'], model_params=model_params)
+    left_branch_pretrained = load_model(model_pretrained.left_branch, left_branch_pretrained_path)
+    right_branch_pretrained = load_model(model_pretrained.right_branch, right_branch_pretrained_path)
+    model = BiModalModelwithPretrainedBranches(model, left_branch_pretrained, right_branch_pretrained).to(device)
     # change_activation(model, torch.nn.ReLU, torch.nn.GELU)
     logging.info('Model prepared.')
     
@@ -92,7 +102,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     samples_weights = get_samples_weights(loaders, num_classes).to(device)  # to handle class imbalance
     criterion_params = load_criterion_specific_params(type_names["criterion"])
     criterion_params['weight'] = samples_weights
-    criterion_params['model'] = model
+    criterion_params['model'] = model.main_model
     
     criterion = prepare_criterion(type_names['criterion'], criterion_params=criterion_params)
     logging.info('Criterion prepared.')
@@ -109,7 +119,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     optim_params = {'lr': lr, 'weight_decay': wd}
     scheduler_params = {'lr_lambda': lambda epoch: LR_LAMBDA}
     
-    optim, lr_scheduler = prepare_optim_and_scheduler(model, optim_name=type_names['optim'], optim_params=optim_params, scheduler_name=type_names['scheduler'], scheduler_params=scheduler_params)
+    optim, lr_scheduler = prepare_optim_and_scheduler(model.main_model, optim_name=type_names['optim'], optim_params=optim_params, scheduler_name=type_names['scheduler'], scheduler_params=scheduler_params)
     logging.info('Optimizer and scheduler prepared.')
     
     scheduler_params['lr_lambda'] = LR_LAMBDA  # problem with omegacong with primitive type
@@ -158,14 +168,13 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     
     # ════════════════════════ prepare extra modules ════════════════════════ #
     
-    
     MAX_REPR_SIZE = 4000
     extra_modules = defaultdict(lambda: None)
-    extra_modules['run_stats'] = RunStatsBiModal(model, optim)
-    extra_modules['dead_relu_left'] = DeadReLU(model.left_branch, is_left_branch=True, is_able=False)
-    extra_modules['dead_relu_right'] = DeadReLU(model.right_branch, is_left_branch=False, is_able=False)
-    extra_modules['trace_fim_train'] = TraceFIM(held_out_train, model, num_classes=num_classes, postfix='train', m_sampling=5)
-    extra_modules['trace_fim_test'] = TraceFIM(held_out_val, model, num_classes=num_classes, postfix='val', m_sampling=5)
+    extra_modules['run_stats'] = RunStatsBiModal(model.main_model, optim)
+    extra_modules['dead_relu_left'] = DeadReLU(model.main_model.left_branch, is_left_branch=True, is_able=False)
+    extra_modules['dead_relu_right'] = DeadReLU(model.main_model.right_branch, is_left_branch=False, is_able=False)
+    extra_modules['trace_fim_train'] = TraceFIM(held_out_train, model.main_model, num_classes=num_classes, postfix='train', m_sampling=5)
+    extra_modules['trace_fim_test'] = TraceFIM(held_out_val, model.main_model, num_classes=num_classes, postfix='val', m_sampling=5)
     # extra_modules['stiffness_train'] = GradientsSpectralStiffness(held_out_train, model, cutoff=MAX_REPR_SIZE)
     # extra_modules['stiffness_test'] = GradientsSpectralStiffness(held_out_val, model, cutoff=MAX_REPR_SIZE)
     # extra_modules['rank_left_train'] = RepresentationsSpectra(model.left_branch, loaders=loaders_rank, is_left_branch=True, modules_list=[torch.nn.Conv2d, torch.nn.Linear], MAX_REPR_SIZE=MAX_REPR_SIZE)
@@ -230,7 +239,7 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     # ════════════════════════ run ════════════════════════ #
     
     
-    logging.info(f'The built model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable parameters and {sum(p.numel() for p in model.parameters() if not p.requires_grad)} non trainable parameters.')
+    logging.info(f'The built model has {sum(p.numel() for p in model.main_model.parameters() if p.requires_grad)} trainable parameters and {sum(p.numel() for p in model.main_model.parameters() if not p.requires_grad)} non trainable parameters.')
     logging.info(f'The dataset has {len(loaders["train"].dataset)} train samples, {len(loaders["test_proper"].dataset)} test samples, {num_classes} classes, each image has a dimension of {input_channels}x{img_height}x{img_width} and each epoch has {batches_per_epoch} batches.')
     
     if exp_name == 'phase1':
@@ -260,4 +269,4 @@ if __name__ == "__main__":
         )
     logging.info(f'Script started model s-{conf.model_name} on dataset s-{conf.dataset_name} with lr={conf.lr}, wd={conf.wd}, phase1={conf.phase1}, phase2={conf.phase2}, phase3={conf.phase3}, phase4={conf.phase4}.')
     
-    objective('all_at_once', conf.model_name, conf.dataset_name, conf.lr, conf.wd, conf.phase1, conf.phase2, conf.phase3, conf.phase4)
+    objective('all_at_once', conf.model_name, conf.dataset_name, conf.lr, conf.wd, conf.phase1, conf.phase2, conf.phase3, conf.phase4, conf.left_branch_pretrained_path, conf.right_branch_pretrained_path)
