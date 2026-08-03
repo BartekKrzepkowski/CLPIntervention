@@ -1,0 +1,16 @@
+name: clpintervention
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10,<3.12
+  - pytorch>=2.1
+  - torchvision
+  - numpy
+  - pillow
+  - tqdm
+  - omegaconf
+  - wandb
+  - pytest

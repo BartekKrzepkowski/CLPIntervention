@@ -1,0 +1,9 @@
+name: clpintervention
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - matplotlib-base
+  - tensorboard
+  - clearml
+  - captum
