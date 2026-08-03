@@ -1,0 +1,90 @@
+protocol_name: cifar10_relative_unimodal_parity_trajectory_p1_40_v1
+protocol_role: full_phase3_trajectory_for_stopper_replay
+mode: all_at_once
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 40
+phase2: 200
+phase3: 200
+phase4: 0
+phase3_lr_warmup_epochs: 4
+phase3_lr_warmup_start_factor: 0.1
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 0
+fim_eval_interval_epochs: 10
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 128
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 10
+resume_checkpoint_interval_epochs: 4
+train_probe_interval_epochs: 10
+
+unimodal_references:
+  left_checkpoint: null
+  right_checkpoint: null
+
+phase2_stopping:
+  mode: enforce
+  selection_scope: global
+  primary_metric: accuracy
+  min_epochs: 200
+  eval_interval_epochs: 5
+  min_delta_full_loss: 0.001
+  full_loss_patience: 10
+  stability_window: 8
+  max_abs_slope_weak_loss: 0.001
+  max_abs_slope_weak_utility: 0.001
+  plateau_confirmations: 3
+  selection_window: 8
+
+phase3_stopping:
+  mode: observe_only
+  decision_rule: relative_unimodal_parity
+  emergency_stop_mode: numerical_only
+  parity_patience: 2
+  recovery_fraction_threshold: 1.0
+  eval_interval_epochs: 4
+  initial_dense_eval_epochs: 4
+  min_epochs: 1
+  trend_window: 1
+  minimum_exposure_evaluations: 1
+  shadow_continue_after_stop: false
+  observe_phase4_transition: endpoint
+  calibration_milestone_epochs: [1, 2, 3, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192, 196, 200]
+
+phase4_selection:
+  eval_interval_epochs: 5
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_UnimodalParity

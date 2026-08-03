@@ -1,0 +1,5 @@
+{
+    "eps": 1e-5,
+    "stochastic_depth_prob": 0.2,
+    "wheter_concate": false
+}

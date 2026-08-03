@@ -1,0 +1,5 @@
+{
+    "activation_name": "relu",
+    "hidden_layers_dim": [32, 256, 256, 256, 128],
+    "pre_mlp_depth": 3
+}

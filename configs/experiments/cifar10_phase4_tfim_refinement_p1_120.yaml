@@ -1,0 +1,60 @@
+protocol_name: cifar10_phase4_tfim_refinement_p1_120_v1
+protocol_role: p4_200_phase3_recovery_refinement_with_early_tfim
+validation_protocol: true
+mode: phase4
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 120
+phase2: 200
+phase3: 50
+phase4: 200
+model_checkpoint: null
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 1
+fim_eval_interval_epochs: 1
+fim_eval_epochs: [5, 8, 11, 14, 17]
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 256
+diagnostic_validation_interval_epochs: 5
+resume_checkpoint_interval_epochs: 20
+train_probe_interval_epochs: 20
+
+phase2_stopping:
+  mode: disabled
+phase3_stopping:
+  mode: disabled
+phase4_selection:
+  eval_interval_epochs: 5
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_P3Oracle_TFIM_P4_200_Refinement

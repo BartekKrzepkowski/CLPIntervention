@@ -1,0 +1,55 @@
+protocol_name: cifar10_gold_tfim_p2_17_v1
+protocol_role: clean_from_scratch_phase2_17_tfim_dynamics_gold
+validation_protocol: true
+mode: all_at_once
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 0
+phase2: 17
+phase3: 0
+phase4: 0
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 1
+fim_eval_interval_epochs: 1
+fim_eval_epochs: [5, 8, 11, 14, 17]
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 256
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 5
+resume_checkpoint_interval_epochs: 17
+train_probe_interval_epochs: 17
+
+phase2_stopping:
+  mode: disabled
+  duration_policy: diagnostic_fixed
+phase3_stopping:
+  mode: disabled
+phase4_selection:
+  eval_interval_epochs: 5
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_TFIM_Dynamics_Gold_P2_17

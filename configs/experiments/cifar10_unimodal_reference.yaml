@@ -1,0 +1,44 @@
+protocol_name: cifar10_unimodal_reference_v2
+protocol_role: seed_paired_clean_unimodal_reference
+mode: left_proper
+unimodal_reference_training: true
+unimodal_initialization_policy: canonical_bimodal_components_v2
+unimodal_reference_eval_interval_epochs: 5
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+epochs: 200
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+fim_measurements_per_epoch: 0
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 10
+resume_checkpoint_interval_epochs: 5
+train_probe_interval_epochs: 10
+
+phase2_stopping:
+  mode: disabled
+phase3_stopping:
+  mode: disabled
+phase4_selection:
+  eval_interval_epochs: 5
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_UnimodalParity

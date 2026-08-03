@@ -1,0 +1,102 @@
+protocol_name: cifar10_validation_protocol_recovery_smoke_v2
+protocol_role: adaptive_technical_smoke
+mode: all_at_once
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 1
+phase2: 3
+phase3: 6
+phase4: 3
+phase3_lr_warmup_epochs: 4
+phase3_lr_warmup_start_factor: 0.1
+protocol_smoke: true
+max_train_batches: 4
+max_eval_batches: 2
+max_test_batches: 2
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 512
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 1
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 0
+fim_samples_per_input: 1
+fim_sampling_seed: 84
+fim_chunk_size: 16
+phase1_validation_interval_epochs: 2
+diagnostic_validation_interval_epochs: 2
+train_probe_interval_epochs: 2
+resume_checkpoint_interval_epochs: 2
+
+phase2_stopping:
+  mode: enforce
+  primary_metric: accuracy
+  min_epochs: 1
+  eval_interval_epochs: 1
+  min_delta_full_loss: 0.0
+  full_loss_patience: 1
+  stability_window: 2
+  max_abs_slope_weak_loss: 1000000.0
+  max_abs_slope_weak_utility: 1000000.0
+  plateau_confirmations: 1
+  selection_window: 2
+
+phase3_stopping:
+  mode: enforce
+  min_epochs: 1
+  adaptive_rule: true
+  decision_rule: weak_recovery
+  recovery_primary_metric: accuracy
+  emergency_stop_mode: numerical_only
+  shadow_continue_after_stop: false
+  min_weak_accuracy_gain: -1.0
+  max_weak_accuracy_slope: 1.0
+  max_weak_quality_slope: 1000000.0
+  plateau_patience: 2
+  confidence_level: 0.95
+  confidence_family_size: 9
+  minimum_exposure_evaluations: 2
+  reversal_patience: 2
+  futility_patience: 2
+  trend_window: 2
+  futility_prediction_horizon_epochs: 2
+  eval_interval_epochs: 1
+  patience: 1
+  safety_patience: 1
+  min_delta: 0.0
+  min_weak_quality_gain: -1000000.0
+  min_weak_utility_gain: -1000000.0
+  max_full_loss_increase: 1000000.0
+  max_dominant_loss_increase: 1000000.0
+  hard_max_full_loss_increase: 1000000.0
+  hard_max_dominant_loss_increase: 1000000.0
+
+phase4_selection:
+  eval_interval_epochs: 1
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase2_test_policy: posthoc_final
+phase4_test_policy: final_only
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: offline
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_Phase3Stopping

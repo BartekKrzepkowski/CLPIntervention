@@ -1,0 +1,34 @@
+{
+  "dataset": "CIFAR-10 training split",
+  "sample_count": 50000,
+  "computed_at": "2026-07-27",
+  "command": "scripts/python_new/get_mean_and_std.py cifar10 --overlap <value> --resize-factor 0.25",
+  "geometry": {
+    "input": [32, 32],
+    "field_width": "ceil(width * (0.5 + overlap / 2))",
+    "blurred_right": "field resized to ceil(0.25 * height) x ceil(0.25 * field_width), then restored"
+  },
+  "interpolation": "torchvision.transforms.InterpolationMode.BILINEAR",
+  "antialias": null,
+  "torch": "2.11.0+cpu",
+  "torchvision": "0.26.0+cpu",
+  "train_file_sha256": {
+    "data_batch_1": "54636561a3ce25bd3e19253c6b0d8538147b0ae398331ac4a2d86c6d987368cd",
+    "data_batch_2": "766b2cef9fbc745cf056b3152224f7cf77163b330ea9a15f9392beb8b89bc5a8",
+    "data_batch_3": "0f00d98ebfb30b3ec0ad19f9756dc2630b89003e10525f5e148445e82aa6a1f9",
+    "data_batch_4": "3f7bb240661948b8f4d53e36ec720d8306f5668bd0071dcb4e6c947f78e9682b",
+    "data_batch_5": "d91802434d8376bbaeeadf58a737e3a1b12ac839077e931237e0dcd43adcb154"
+  },
+  "statistics": {
+    "0.0": {
+      "proper_left": {"mean": [0.4915608321950317, 0.4824227237087908, 0.4468044428398145], "std": [0.2470178401439214, 0.24345336919802013, 0.26166858447567926]},
+      "proper_right": {"mean": [0.49123854756134744, 0.4818941155435833, 0.4462574056167809], "std": [0.2470465242578638, 0.2435166015426914, 0.26150679336264493]},
+      "blurred_right": {"mean": [0.49135468529694687, 0.48185410232077586, 0.4461651198096588], "std": [0.20231621757381077, 0.19990853153973656, 0.22172341125578746]}
+    },
+    "0.125": {
+      "proper_left": {"mean": [0.4919278650465282, 0.4817010015715583, 0.4461662961518023], "std": [0.24664751492283543, 0.243049730414396, 0.26093230506660736]},
+      "proper_right": {"mean": [0.49164333684916606, 0.48123654295264184, 0.4457057886634943], "std": [0.24666987280713285, 0.24309154138602998, 0.26078715614853976]},
+      "blurred_right": {"mean": [0.49158368517123047, 0.4810221906115423, 0.4454515447791533], "std": [0.2024501112316537, 0.19999062794872283, 0.2214495767624039]}
+    }
+  }
+}

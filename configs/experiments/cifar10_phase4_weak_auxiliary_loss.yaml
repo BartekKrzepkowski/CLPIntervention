@@ -1,0 +1,81 @@
+protocol_name: cifar10_phase4_weak_auxiliary_loss_v1
+protocol_role: phase4_asymmetric_auxiliary_loss_diagnostic
+validation_protocol: true
+mode: phase4
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 40
+phase2: 200
+phase3: 40
+phase4: 10
+model_checkpoint: null
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 0
+fim_eval_interval_epochs: 10
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 128
+diagnostic_validation_interval_epochs: 10
+resume_checkpoint_interval_epochs: 2
+train_probe_interval_epochs: 10
+
+phase2_stopping:
+  mode: disabled
+
+phase3_stopping:
+  mode: disabled
+
+phase4_selection:
+  eval_interval_epochs: 5
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase4_diagnostics:
+  enabled: true
+  dense_eval_epochs: [0, 1, 2, 3, 4, 5, 10]
+  hybrid_eval_epochs: [0, 1, 2, 3, 4, 5, 10]
+
+# First isolate the objective; staged encoder unfreezing remains a later test.
+phase4_staged_unfreezing:
+  enabled: false
+  shared_only_epochs: 4
+
+# One model and shared weights. The full and weak-only forwards both update the
+# same right encoder, shared trunk and classifier. With dominant_weight=0 no
+# dominant-only training forward is executed.
+phase4_auxiliary_loss:
+  enabled: true
+  weak_weight: 1.0
+  dominant_weight: 0.0
+
+phase4_lr_warmup_epochs: 4
+phase4_lr_warmup_start_factor: 0.1
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_UnimodalParity

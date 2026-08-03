@@ -1,0 +1,105 @@
+protocol_name: cifar10_full_umt_phase3_p1_120_v2
+protocol_role: post_phase2_full_active_two_teacher_umt_intervention
+validation_protocol: true
+mode: phase3
+umt: true
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+distill: 1.0
+
+phase1: 120
+phase2: 200
+phase3: 200
+phase4: 0
+model_checkpoint: null
+left_branch_pretrained_path: null
+right_branch_pretrained_path: null
+phase3_lr_warmup_epochs: 4
+phase3_lr_warmup_start_factor: 0.1
+phase3_intervention:
+  # Both modalities contribute to the forward pass.  Both student encoders and
+  # the shared trunk/classifier are trainable; only the two teachers are frozen.
+  mode: full_active
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_measurements_per_epoch: 0
+fim_eval_interval_epochs: 20
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 20
+resume_checkpoint_interval_epochs: 20
+train_probe_interval_epochs: 20
+
+phase2_stopping:
+  mode: disabled
+
+phase3_stopping:
+  mode: observe_only
+  observe_phase4_transition: endpoint
+  decision_rule: local_accuracy
+  emergency_stop_mode: numerical_only
+  shadow_continue_after_stop: true
+  min_epochs: 20
+  eval_interval_epochs: 20
+  initial_dense_eval_epochs: 0
+  minimum_exposure_evaluations: 2
+  trend_window: 2
+  target_patience: 2
+  pareto_patience: 2
+  futility_harm_patience: 2
+  reversal_patience: 2
+  futility_patience: 2
+  plateau_patience: 2
+  patience: 4
+  safety_patience: 2
+  min_delta: 0.001
+  min_weak_accuracy_gain: 0.0
+  min_weak_quality_gain: 0.0
+  min_weak_utility_gain: 0.0
+  max_weak_accuracy_slope: 0.0
+  max_weak_quality_slope: 0.001
+  max_full_loss_increase: 0.05
+  max_dominant_loss_increase: 0.05
+  hard_max_full_loss_increase: 0.20
+  hard_max_dominant_loss_increase: 0.20
+  max_full_accuracy_drop: 0.05
+  max_dominant_accuracy_drop: 0.05
+  hard_max_full_accuracy_drop: 0.10
+  hard_max_dominant_accuracy_drop: 0.10
+  confidence_level: 0.95
+  confidence_family_size: 16
+  futility_prediction_horizon_epochs: 20
+  gradient_diagnostic_interval_epochs: 20
+  gradient_probe_max_batches: 1
+  calibration_milestone_epochs: [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
+
+phase4_selection:
+  eval_interval_epochs: 5
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_FullUMT_P1_120

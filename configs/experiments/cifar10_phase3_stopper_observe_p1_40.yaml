@@ -1,0 +1,116 @@
+protocol_name: cifar10_phase3_stopper_observe_p1_40_v1
+protocol_role: validation_phase3_stopper_observe_trace
+calibration_seed_set: [83, 184, 285]
+calibration_scope: p1_40_phase3_shadow_replay_with_fixed_milestones
+mode: all_at_once
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 40
+phase2: 200
+phase3: 200
+phase4: 200
+phase3_lr_warmup_epochs: 4
+phase3_lr_warmup_start_factor: 0.1
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 0
+fim_eval_interval_epochs: 10
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 128
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 10
+resume_checkpoint_interval_epochs: 10
+train_probe_interval_epochs: 10
+
+phase2_stopping:
+  mode: enforce
+  selection_scope: global
+  primary_metric: accuracy
+  min_epochs: 200
+  eval_interval_epochs: 5
+  min_delta_full_loss: 0.001
+  full_loss_patience: 10
+  stability_window: 8
+  max_abs_slope_weak_loss: 0.001
+  max_abs_slope_weak_utility: 0.001
+  plateau_confirmations: 3
+  selection_window: 8
+
+phase3_stopping:
+  mode: observe_only
+  observe_phase4_transition: hypothetical_selected
+  min_epochs: 4
+  adaptive_rule: true
+  decision_rule: local_accuracy
+  emergency_stop_mode: numerical_only
+  shadow_continue_after_stop: true
+  min_weak_accuracy_gain: 0.0
+  recovery_primary_metric: accuracy
+  max_weak_accuracy_slope: 0.0
+  max_weak_quality_slope: 0.001
+  plateau_patience: 3
+  calibration_milestone_epochs: [20, 40, 60, 80, 200]
+  confidence_level: 0.95
+  confidence_family_size: 16
+  minimum_exposure_evaluations: 4
+  reversal_patience: 3
+  futility_patience: 3
+  trend_window: 4
+  target_patience: 2
+  pareto_patience: 2
+  futility_harm_patience: 2
+  gradient_conflict_threshold: 0.0
+  gradient_diagnostic_interval_epochs: 10
+  gradient_probe_max_batches: 1
+  futility_prediction_horizon_epochs: 10
+  eval_interval_epochs: 4
+  initial_dense_eval_epochs: 4
+  patience: 8
+  safety_patience: 2
+  min_delta: 0.001
+  min_weak_quality_gain: 0.0
+  min_weak_utility_gain: 0.0
+  max_full_loss_increase: 0.05
+  max_dominant_loss_increase: 0.05
+  hard_max_full_loss_increase: 0.20
+  hard_max_dominant_loss_increase: 0.20
+  max_full_accuracy_drop: 0.05
+  max_dominant_accuracy_drop: 0.05
+  hard_max_full_accuracy_drop: 0.10
+  hard_max_dominant_accuracy_drop: 0.10
+
+phase4_selection:
+  eval_interval_epochs: 5
+  primary_metric: accuracy
+  budget_total_epochs: 200
+
+phase2_test_policy: disabled
+phase4_test_policy: disabled
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
+wandb_entity: bartekk
+wandb_project: CLPIntervention_Phase3Stopping

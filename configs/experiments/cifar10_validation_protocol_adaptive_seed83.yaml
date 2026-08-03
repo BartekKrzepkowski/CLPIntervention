@@ -1,0 +1,84 @@
+protocol_name: cifar10_validation_protocol_adaptive_v1
+protocol_role: operational_adaptive_intervention
+mode: all_at_once
+model_name: mm_resnet
+dataset_name: mm_cifar10
+seed: 83
+lr: 0.6
+wd: 0.0
+lr_lambda: 1.0
+
+phase1: 80
+phase2: 200
+phase3: 200
+phase4: 200
+
+split_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+normalization_profile: cifar10_stratified_44k_5k_1k_seed83_v1
+verify_dataset_files: true
+
+batch_size: 125
+num_workers: 12
+overlap: 0.0
+resize_factor: 0.25
+clip_value: 0.0
+logs_per_epoch: 10
+
+fim_probe_source: protocol_split
+fim_measurements_per_epoch: 1
+fim_eval_interval_epochs: 10
+fim_samples_per_input: 5
+fim_sampling_seed: 84
+fim_chunk_size: 128
+phase1_validation_interval_epochs: 5
+diagnostic_validation_interval_epochs: 10
+resume_checkpoint_interval_epochs: 10
+train_probe_interval_epochs: 10
+
+phase2_stopping:
+  mode: enforce
+  min_epochs: 20
+  eval_interval_epochs: 5
+  min_delta_full_loss: 0.001
+  full_loss_patience: 10
+  stability_window: 8
+  max_abs_slope_weak_loss: 0.001
+  max_abs_slope_weak_utility: 0.001
+  plateau_confirmations: 3
+  selection_window: 8
+
+phase3_stopping:
+  mode: enforce
+  min_epochs: 5
+  adaptive_rule: true
+  confidence_level: 0.95
+  confidence_family_size: 8
+  minimum_exposure_evaluations: 5
+  reversal_patience: 3
+  futility_patience: 3
+  trend_window: 5
+  futility_prediction_horizon_epochs: 10
+  eval_interval_epochs: 5
+  patience: 8
+  safety_patience: 3
+  min_delta: 0.001
+  min_weak_quality_gain: 0.0
+  min_weak_utility_gain: 0.0
+  max_full_loss_increase: 0.05
+  max_dominant_loss_increase: 0.05
+  hard_max_full_loss_increase: 0.20
+  hard_max_dominant_loss_increase: 0.20
+
+phase4_selection:
+  eval_interval_epochs: 5
+  budget_total_epochs: 200
+
+phase4_target_train_acc: null
+phase4_weight_decay: null
+phase4_lr_lambda: null
+phase4_bn_recalibration_batches: 0
+phase4_bn_recalibration_scope: main_branch
+
+logger: wandb
+logger_mode: online
+disable_tqdm: true
