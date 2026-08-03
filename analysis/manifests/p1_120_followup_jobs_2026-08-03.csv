@@ -1,0 +1,7 @@
+experiment,seed,source_e3,slurm_job_id
+shared_phase4_fim,83,40,20361561
+shared_phase4_fim,184,40,20361562
+shared_phase4_fim,285,40,20361560
+frozen_left_active_phase3,83,0,20361566
+frozen_left_active_phase3,184,0,20361565
+frozen_left_active_phase3,285,0,20361567

@@ -1,0 +1,125 @@
+wandb_entity,wandb_project,wandb_run_id,slurm_job_id,protocol,seed,phase1,phase2,phase3,phase4,status,notes
+bartekk,CLPIntervention_Phase3Stopping,qji2o80g,20258725,cifar10_phase3_stopper_observe_p1_40_v1,83,40,200,200,200,failed,Failed at first Phase-3 epoch before get_last_lr fix
+bartekk,CLPIntervention_Phase3Stopping,6jr9l846,20258727,cifar10_phase3_stopper_observe_p1_40_v1,184,40,200,200,200,failed,Failed at first Phase-3 epoch before get_last_lr fix
+bartekk,CLPIntervention_Phase3Stopping,tnbu2do4,20258726,cifar10_phase3_stopper_observe_p1_40_v1,285,40,200,200,200,failed,Failed at first Phase-3 epoch before get_last_lr fix
+bartekk,CLPIntervention_Phase3Stopping,9dn3areq,20271382,cifar10_phase3_stopper_observe_p1_40_v1,83,40,200,200,200,completed,Resumed pre-Phase-3; per-step warmup; selected e3=195
+bartekk,CLPIntervention_Phase3Stopping,jt7wysoc,20271386,cifar10_phase3_stopper_observe_p1_40_v1,184,40,200,200,200,completed,Resumed pre-Phase-3; per-step warmup; selected e3=175
+bartekk,CLPIntervention_Phase3Stopping,9lldtxng,20271385,cifar10_phase3_stopper_observe_p1_40_v1,285,40,200,200,200,completed,Resumed pre-Phase-3; per-step warmup; selected e3=200
+bartekk,CLPIntervention_Phase3Stopping,f281x6re,20273138,cifar10_phase4_milestone_p1_40_v1,83,40,200,20,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,9svuw236,20273152,cifar10_phase4_milestone_p1_40_v1,83,40,200,40,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,3qfosuj5,20273143,cifar10_phase4_milestone_p1_40_v1,83,40,200,60,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,bc4lwwfu,20273146,cifar10_phase4_milestone_p1_40_v1,83,40,200,80,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,rkav3tie,20273140,cifar10_phase4_milestone_p1_40_v1,83,40,200,200,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,17oc3d1x,20273145,cifar10_phase4_milestone_p1_40_v1,184,40,200,20,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,ag1046vl,20273141,cifar10_phase4_milestone_p1_40_v1,184,40,200,40,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,sjcgvzy6,20273147,cifar10_phase4_milestone_p1_40_v1,184,40,200,60,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,waa1yqfr,20273153,cifar10_phase4_milestone_p1_40_v1,184,40,200,80,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,sp2jucor,20273139,cifar10_phase4_milestone_p1_40_v1,184,40,200,200,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,ccvy5456,20273137,cifar10_phase4_milestone_p1_40_v1,285,40,200,20,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,4pbhvphd,20273148,cifar10_phase4_milestone_p1_40_v1,285,40,200,40,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,gfxxrlek,20273149,cifar10_phase4_milestone_p1_40_v1,285,40,200,60,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,fbvx1en2,20273142,cifar10_phase4_milestone_p1_40_v1,285,40,200,80,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,xj0cqayb,20273150,cifar10_phase4_milestone_p1_40_v1,285,40,200,200,200,completed,Validation-selected Phase-4 checkpoint; post-hoc test proper and blurred
+bartekk,CLPIntervention_Phase3Stopping,pr4byikq,20273663,cifar10_phase3_local_accuracy_shadow_p1_40_v1,83,40,200,80,0,completed,Standalone Phase-3 shadow selected e3=30 by paired-CI target; gradient probe logged
+bartekk,CLPIntervention_Phase3Stopping,rxmj419y,20281023,cifar10_phase3_local_accuracy_shadow_p1_40_v1,184,40,200,80,0,completed,Exact paired-CI target selected e3=35
+bartekk,CLPIntervention_Phase3Stopping,9ghnidgh,20281024,cifar10_phase3_local_accuracy_shadow_p1_40_v1,285,40,200,80,0,completed,Exact paired-CI target selected e3=30; later Pareto reversal at e3=65
+bartekk,CLPIntervention_Phase3Stopping,axml02gi,20282321,cifar10_phase4_stopper_selected_p1_40_v1,83,40,200,30,200,completed,Validation-selected P4 from exact e3=30; test final-only
+bartekk,CLPIntervention_Phase3Stopping,j8c2kzju,20282322,cifar10_phase4_stopper_selected_p1_40_v1,184,40,200,35,200,completed,Validation-selected P4 from exact e3=35; test final-only
+bartekk,CLPIntervention_Phase3Stopping,nji249wf,20282324,cifar10_phase4_stopper_selected_p1_40_v1,285,40,200,30,200,completed,Validation-selected P4 from exact e3=30; test final-only
+bartekk,CLPIntervention_Phase3Stopping,,20282557,cifar10_phase4_confirmation_window_p1_40_v1,184,40,200,30,200,failed,Source e3=30 checkpoint had been pruned after e3=35 became frozen selection; no training executed
+bartekk,CLPIntervention_Phase3Stopping,absavsy8,20282574,cifar10_phase3_confirmation_window_regen_p1_40_v1,184,40,200,30,0,completed,Regenerated e3=30 from seed-184 pre-intervention checkpoint; weak/full/dominant=.7916/.5520/.5846
+bartekk,CLPIntervention_Phase3Stopping,7org63if,20282582,cifar10_phase4_confirmation_window_p1_40_v1,184,40,200,30,200,completed,Validation/test proper=.8836/.8728 from regenerated first target e3=30
+bartekk,CLPIntervention_UnimodalParity,,20285723,relative_unimodal_parity_gpu_tests,83,0,0,0,0,completed,2 passed: only right encoder updates and paired initialization is exact
+bartekk,CLPIntervention_UnimodalParity,,20285726,cifar10_unimodal_reference_smoke_v1,83,0,0,0,0,failed,Right reference exposed incompatible historical RunStats on frozen branch
+bartekk,CLPIntervention_UnimodalParity,,20285727,cifar10_unimodal_reference_smoke_v1,83,0,0,0,0,failed,Left reference exposed incompatible historical RunStats on frozen branch
+bartekk,CLPIntervention_UnimodalParity,gjwodhnw,20285728,cifar10_unimodal_reference_smoke_v1,83,0,0,0,0,completed,Offline right reference smoke; selected epoch 2
+bartekk,CLPIntervention_UnimodalParity,w5bnws6i,20285729,cifar10_unimodal_reference_smoke_v1,83,0,0,0,0,completed,Offline left reference smoke; selected epoch 2
+bartekk,CLPIntervention_UnimodalParity,,20285734,cifar10_relative_unimodal_parity_smoke_v1,83,1,2,4,2,failed,Shortened Phase 2 rejected because protocol_smoke was not enabled
+bartekk,CLPIntervention_UnimodalParity,dnmcxuwe,20285747,cifar10_relative_unimodal_parity_smoke_v1,83,1,2,4,2,completed,Offline four-phase smoke; e3=0 parity skip and P4 final-only evaluation passed
+bartekk,CLPIntervention_UnimodalParity,0eipjroa,20285762,cifar10_unimodal_reference_v1,83,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,vamfdsni,20285766,cifar10_unimodal_reference_v1,83,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,rj8oi5t8,20285763,cifar10_unimodal_reference_v1,184,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,97s1ik2p,20285764,cifar10_unimodal_reference_v1,184,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,8wq2iw8d,20285765,cifar10_unimodal_reference_v1,285,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,vtanizbj,20285767,cifar10_unimodal_reference_v1,285,0,0,0,0,cancelled,Cancelled after rolling-retention bug was found
+bartekk,CLPIntervention_UnimodalParity,7t2s6amn,20285790,cifar10_unimodal_reference_v1,83,0,0,0,0,completed,Left reference selected e190 val_acc=.8594
+bartekk,CLPIntervention_UnimodalParity,lmdfxgy2,20285791,cifar10_unimodal_reference_v1,83,0,0,0,0,completed,Right reference selected e150 val_acc=.8506
+bartekk,CLPIntervention_UnimodalParity,ju56v86b,20285793,cifar10_unimodal_reference_v1,184,0,0,0,0,completed,Left reference selected e120 val_acc=.8644
+bartekk,CLPIntervention_UnimodalParity,477j7ul3,20285795,cifar10_unimodal_reference_v1,184,0,0,0,0,completed,Right reference selected e155 val_acc=.8556
+bartekk,CLPIntervention_UnimodalParity,v1h2fiv9,20285792,cifar10_unimodal_reference_v1,285,0,0,0,0,completed,Left reference selected e135 val_acc=.8612
+bartekk,CLPIntervention_UnimodalParity,cijwymss,20285794,cifar10_unimodal_reference_v1,285,0,0,0,0,completed,Right reference selected e170 val_acc=.8564
+bartekk,CLPIntervention_UnimodalParity,rqmwbxq4,20290229,cifar10_relative_unimodal_parity_p1_40_v1,83,40,200,200,200,failed,P1/P2 completed; RunStats failed at first frozen Phase-3 step; selected P2 e165 retained
+bartekk,CLPIntervention_UnimodalParity,gzmssnt4,20290227,cifar10_relative_unimodal_parity_p1_40_v1,184,40,200,200,200,failed,P1/P2 completed; RunStats failed at first frozen Phase-3 step; selected P2 e195 retained
+bartekk,CLPIntervention_UnimodalParity,pfpo232n,20290228,cifar10_relative_unimodal_parity_p1_40_v1,285,40,200,200,200,failed,P1/P2 completed; RunStats failed at first frozen Phase-3 step; selected P2 e200 retained
+bartekk,CLPIntervention_UnimodalParity,j1pk0etn,20290388,cifar10_relative_unimodal_parity_trajectory_p1_40_v1,83,40,200,200,0,completed,Full P3 trajectory; exact fallback e188; recovery q90/q95 e36/e56
+bartekk,CLPIntervention_UnimodalParity,300r9qpk,20290387,cifar10_relative_unimodal_parity_trajectory_p1_40_v1,184,40,200,200,0,completed,Full P3 trajectory; exact selected e112; recovery q90/q95 e24/e36
+bartekk,CLPIntervention_UnimodalParity,rail4bqu,20290386,cifar10_relative_unimodal_parity_trajectory_p1_40_v1,285,40,200,200,0,completed,Full P3 trajectory; exact fallback e156; recovery q90/q95 e36/e76
+bartekk,CLPIntervention_UnimodalParity,9tpb09pu,20331032,cifar10_phase4_unimodal_recovery_q90_p1_40_seed83_v1,83,40,200,36,200,completed,Validation-only P4 from q90 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,g32pncsf,20331033,cifar10_phase4_unimodal_recovery_q90_p1_40_seed184_v1,184,40,200,24,200,completed,Validation-only P4 from q90 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,vi9xlman,20331037,cifar10_phase4_unimodal_recovery_q90_p1_40_seed285_v1,285,40,200,36,200,completed,Validation-only P4 from q90 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,231n3ai8,20331034,cifar10_phase4_unimodal_recovery_q95_p1_40_seed83_v1,83,40,200,56,200,completed,Validation-only P4 from q95 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,nok8j205,20331036,cifar10_phase4_unimodal_recovery_q95_p1_40_seed184_v1,184,40,200,36,200,completed,Validation-only P4 from q95 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,rwm3udst,20331035,cifar10_phase4_unimodal_recovery_q95_p1_40_seed285_v1,285,40,200,76,200,completed,Validation-only P4 from q95 selection; test disabled
+bartekk,CLPIntervention_UnimodalParity,y0y9j207,20336050,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e20_v1,83,40,200,20,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,cs7vux9d,20336060,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e40_v1,83,40,200,40,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,b4qi0wvj,20336052,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e60_v1,83,40,200,60,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,bjjc8ead,20336053,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e80_v1,83,40,200,80,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,dgnvr7f8,20336059,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e20_v1,184,40,200,20,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,7nlgt0u4,20336049,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e40_v1,184,40,200,40,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,9f0x1s0g,20336054,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e60_v1,184,40,200,60,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,7jxfwsyp,20336056,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e80_v1,184,40,200,80,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,tp70l37x,20336051,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e20_v1,285,40,200,20,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,cpb8tzua,20336058,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e40_v1,285,40,200,40,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,l2ic6fcs,20336057,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e60_v1,285,40,200,60,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,fhw35j7e,20336055,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e80_v1,285,40,200,80,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,kewumr4s,20354218,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed83_warmup0_v1,83,40,200,40,10,completed,P4 hybrid diagnostic without warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,chh3lqd4,20354223,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed184_warmup0_v1,184,40,200,40,10,completed,P4 hybrid diagnostic without warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,jjm3fetl,20354219,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed285_warmup0_v1,285,40,200,40,10,completed,P4 hybrid diagnostic without warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,czd2r73o,20354221,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed83_warmup4_v1,83,40,200,40,10,completed,P4 hybrid diagnostic with four-epoch per-step warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,edyjjeu2,20354220,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed184_warmup4_v1,184,40,200,40,10,completed,P4 hybrid diagnostic with four-epoch per-step warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,55oicy6t,20354222,cifar10_phase4_compatibility_diagnostic_p1_40_e40_seed285_warmup4_v1,285,40,200,40,10,completed,P4 hybrid diagnostic with four-epoch per-step warmup; test disabled
+bartekk,CLPIntervention_UnimodalParity,1ce590np,20355173,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e100_v1,83,40,200,100,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,l26414jy,20355172,cifar10_phase4_frozen_shared_milestone_p1_40_seed83_e120_v1,83,40,200,120,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,e29c1ks5,20355176,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e100_v1,184,40,200,100,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,v7aw5jxn,20355177,cifar10_phase4_frozen_shared_milestone_p1_40_seed184_e120_v1,184,40,200,120,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,8x9fsd6b,20355178,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e100_v1,285,40,200,100,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,hjo5vifs,20355175,cifar10_phase4_frozen_shared_milestone_p1_40_seed285_e120_v1,285,40,200,120,200,completed,Frozen-shared P3 milestone P4; validation-only; test disabled
+bartekk,CLPIntervention_UnimodalParity,9z6c7kdo,20355918,cifar10_phase4_shared_only_prefix_p1_40_e40_seed83_v1,83,40,200,40,10,invalid,Requested staged prefix was omitted from trainer run_config; replicated warmup control
+bartekk,CLPIntervention_UnimodalParity,t4egphqb,20355919,cifar10_phase4_shared_only_prefix_p1_40_e40_seed184_v1,184,40,200,40,10,invalid,Requested staged prefix was omitted from trainer run_config; replicated warmup control
+bartekk,CLPIntervention_UnimodalParity,r7q9sk0z,20355917,cifar10_phase4_shared_only_prefix_p1_40_e40_seed285_v1,285,40,200,40,10,invalid,Requested staged prefix was omitted from trainer run_config; replicated warmup control
+bartekk,CLPIntervention_UnimodalParity,co1bv6qt,20355958,cifar10_phase4_shared_only_prefix_p1_40_e40_seed83_r2_v1,83,40,200,40,10,completed,Correct shared-only 4 epoch prefix then full unfreeze; test disabled
+bartekk,CLPIntervention_UnimodalParity,4d3tngov,20355957,cifar10_phase4_shared_only_prefix_p1_40_e40_seed184_r2_v1,184,40,200,40,10,completed,Correct shared-only 4 epoch prefix then full unfreeze; test disabled
+bartekk,CLPIntervention_UnimodalParity,9109nozb,20355956,cifar10_phase4_shared_only_prefix_p1_40_e40_seed285_r2_v1,285,40,200,40,10,completed,Correct shared-only 4 epoch prefix then full unfreeze; test disabled
+bartekk,CLPIntervention_FullUMT_P1_120,1uedra69,20361885,cifar10_full_umt_phase3_p1_120_v2,83,120,200,200,0,completed,Full active student with paired left and right teachers
+bartekk,CLPIntervention_FullUMT_P1_120,je8odnxh,20361888,cifar10_full_umt_phase3_p1_120_v2,184,120,200,200,0,completed,Full active student with paired left and right teachers
+bartekk,CLPIntervention_FullUMT_P1_120,icr8s3vh,20361889,cifar10_full_umt_phase3_p1_120_v2,285,120,200,200,0,completed,Full active student with paired left and right teachers
+bartekk,CLPIntervention_SharedTrunk_P1_120_TFIM,gcp6iv9z,20361878,cifar10_phase4_from_shared_e40_tfim_v2,83,120,200,40,200,completed,TFIM every 10 epochs; chunk 256; test disabled
+bartekk,CLPIntervention_SharedTrunk_P1_120_TFIM,r8ker3i3,20361879,cifar10_phase4_from_shared_e40_tfim_v2,184,120,200,40,200,completed,TFIM every 10 epochs; chunk 256; test disabled
+bartekk,CLPIntervention_SharedTrunk_P1_120_TFIM,1i9nyzr5,20361880,cifar10_phase4_from_shared_e40_tfim_v2,285,120,200,40,200,completed,TFIM every 10 epochs; chunk 256; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,zlcpemfb,20361984,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,0,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,91vt7v25,20361985,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,20,40,completed,Best validation full 0.8874 at e4=5; 8 TFIM looks; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,vgxt35d8,20361986,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,40,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,xfzj3s66,20361987,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,60,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,zswpbwcv,20361988,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,80,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,vytybi4b,20361990,cifar10_phase4_tfim_oracle_p1_120_v1,83,120,200,100,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,1ch7z0ld,20361991,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,0,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,cmbwtdt9,20361992,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,20,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,sofvr9wb,20361993,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,40,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,x3szgxy3,20361994,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,60,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,bxitm8jd,20361995,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,80,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,i5c6vmpa,20361996,cifar10_phase4_tfim_oracle_p1_120_v1,184,120,200,100,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,9vtu8nro,20361999,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,0,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,bhx1vaq9,20362000,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,20,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,uxq4p23j,20362001,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,40,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,f755gq6a,20362002,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,60,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,kmywfotu,20362003,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,80,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_P3Oracle_TFIM_P4_40,u91qyb6t,20362004,cifar10_phase4_tfim_oracle_p1_120_v1,285,120,200,100,40,completed,Coarse oracle; TFIM every 5 epochs; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,99h4r4m9,20362516,cifar10_clean_p2_tfim_50_v1,83,0,50,0,0,completed,clean bimodal P2=50; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,m77b0ipa,20362509,cifar10_clean_p2_tfim_50_v1,184,0,50,0,0,completed,clean bimodal P2=50; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,d3fztzra,20362511,cifar10_clean_p2_tfim_50_v1,285,0,50,0,0,completed,clean bimodal P2=50; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,a53x3v38,20362515,cifar10_unimodal_tfim_50_v2,83,0,0,0,0,completed,left_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,wqas8hr5,20362512,cifar10_unimodal_tfim_50_v2,184,0,0,0,0,completed,left_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,vkw1rd9g,20362510,cifar10_unimodal_tfim_50_v2,285,0,0,0,0,completed,left_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,4y2przjj,20362508,cifar10_unimodal_tfim_50_v2,83,0,0,0,0,completed,right_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,dryoqryt,20362513,cifar10_unimodal_tfim_50_v2,184,0,0,0,0,completed,right_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled
+bartekk,CLPIntervention_TFIM_CleanControls_50,f5rn25am,20362514,cifar10_unimodal_tfim_50_v2,285,0,0,0,0,completed,right_proper; TFIM every 5 epochs; chunk 256; v2 initialization; test disabled

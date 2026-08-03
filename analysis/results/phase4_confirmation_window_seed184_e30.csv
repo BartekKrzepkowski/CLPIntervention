@@ -1,0 +1,2 @@
+seed,e3,slurm_job_id,wandb_run_id,selected_p4_epoch,val_full_accuracy,val_full_loss,val_dominant_accuracy,val_weak_accuracy,test_proper_accuracy,test_proper_loss,test_blurred_accuracy,test_blurred_loss,budget_selected_p4_epoch,budget_val_full_accuracy,budget_test_proper_accuracy,budget_test_blurred_accuracy
+184,30,20282582,7org63if,180,0.8836,0.8992260261771003,0.8076,0.3284,0.8728,0.936617549136281,0.8419,1.1520557574927808,80,0.881,0.8722,0.8443

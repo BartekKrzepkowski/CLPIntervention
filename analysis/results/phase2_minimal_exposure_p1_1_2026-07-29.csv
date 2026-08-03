@@ -1,0 +1,4 @@
+seed,wandb_run_id,min_loss_epoch,min_loss,accuracy_at_min_loss,max_accuracy_epoch,max_accuracy,loss_at_max_accuracy,endpoint_accuracy,endpoint_loss
+83,1ok30aqi,35,0.4219962307,0.8766,135,0.9028,0.5898572465,0.9024,0.6443889016
+184,f39pfh4y,20,0.4908817785,0.8340,170,0.8950,0.6738851225,0.8900,0.7011777430
+285,h4e0liff,30,0.4856043413,0.8468,195,0.8894,0.7047796965,0.8866,0.7283042391

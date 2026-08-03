@@ -1,0 +1,4 @@
+seed,e3,slurm_job_id,wandb_run_id,selected_p4_epoch,val_full_accuracy,val_full_loss,val_dominant_accuracy,val_weak_accuracy,test_proper_accuracy,test_proper_loss,test_blurred_accuracy,test_blurred_loss,budget_selected_p4_epoch,budget_val_full_accuracy,budget_test_proper_accuracy,budget_test_blurred_accuracy
+83,30,20282321,axml02gi,110,0.8922,0.8227087457864705,0.838,0.3526,0.8839,0.8883363831788301,0.8595,1.0828634440898894,110,0.8922,0.8839,0.8595
+184,35,20282322,j8c2kzju,160,0.886,0.835493665771571,0.7928,0.3544,0.8746,0.8815653804689646,0.8405,1.152150233462453,160,0.886,0.8746,0.8405
+285,30,20282324,nji249wf,165,0.8812,0.8959935412734216,0.8408,0.3214,0.8713,0.9497298862785101,0.8495,1.1222788400948047,165,0.8812,0.8713,0.8495

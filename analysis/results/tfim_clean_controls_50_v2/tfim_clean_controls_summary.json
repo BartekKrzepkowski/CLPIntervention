@@ -1,0 +1,193 @@
+{
+  "seeds": {
+    "83": {
+      "epochs": [
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50
+      ],
+      "bimodal": {
+        "trace_left": {
+          "first": 44.81178540954589,
+          "last": 59.33543321533201,
+          "min": 44.81178540954589,
+          "max": 73.01475275268555,
+          "epoch_of_min": 5,
+          "epoch_of_max": 35
+        },
+        "trace_right": {
+          "first": 176.5701443847656,
+          "last": 152.66093586425785,
+          "min": 151.72352946777343,
+          "max": 186.02477421875005,
+          "epoch_of_min": 20,
+          "epoch_of_max": 25
+        },
+        "ratio": {
+          "first": 0.25379027431524304,
+          "last": 0.38867463266279145,
+          "min": 0.25379027431524304,
+          "max": 0.4238893041981486,
+          "epoch_of_min": 5,
+          "epoch_of_max": 35
+        }
+      },
+      "unimodal": {
+        "trace_left": {
+          "first": 174.60891206054677,
+          "last": 149.84354360351563,
+          "min": 137.70984274902347,
+          "max": 174.60891206054677,
+          "epoch_of_min": 15,
+          "epoch_of_max": 5
+        },
+        "trace_right": {
+          "first": 124.3990441650391,
+          "last": 178.54089384765626,
+          "min": 124.3990441650391,
+          "max": 178.54089384765626,
+          "epoch_of_min": 5,
+          "epoch_of_max": 50
+        }
+      },
+      "final_context_ratios": {
+        "bimodal_left_over_unimodal_left": 0.39598258148734733,
+        "bimodal_right_over_unimodal_right": 0.8550474492108177
+      },
+      "ratio_crosses_one": false
+    },
+    "184": {
+      "epochs": [
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50
+      ],
+      "bimodal": {
+        "trace_left": {
+          "first": 34.28033897705078,
+          "last": 50.4236662384033,
+          "min": 31.08549264221191,
+          "max": 50.4236662384033,
+          "epoch_of_min": 20,
+          "epoch_of_max": 50
+        },
+        "trace_right": {
+          "first": 134.19227734375002,
+          "last": 191.72687258300786,
+          "min": 134.19227734375002,
+          "max": 191.72687258300786,
+          "epoch_of_min": 5,
+          "epoch_of_max": 50
+        },
+        "ratio": {
+          "first": 0.2554568684961255,
+          "last": 0.26299738543547524,
+          "min": 0.20048323014060068,
+          "max": 0.2914054209950806,
+          "epoch_of_min": 10,
+          "epoch_of_max": 45
+        }
+      },
+      "unimodal": {
+        "trace_left": {
+          "first": 135.6270549316406,
+          "last": 145.871062109375,
+          "min": 135.6270549316406,
+          "max": 166.2103819213867,
+          "epoch_of_min": 5,
+          "epoch_of_max": 45
+        },
+        "trace_right": {
+          "first": 122.82142863769535,
+          "last": 221.87769726562507,
+          "min": 122.82142863769535,
+          "max": 221.87769726562507,
+          "epoch_of_min": 5,
+          "epoch_of_max": 50
+        }
+      },
+      "final_context_ratios": {
+        "bimodal_left_over_unimodal_left": 0.34567285319822605,
+        "bimodal_right_over_unimodal_right": 0.8641106111421303
+      },
+      "ratio_crosses_one": false
+    },
+    "285": {
+      "epochs": [
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50
+      ],
+      "bimodal": {
+        "trace_left": {
+          "first": 44.74745148010254,
+          "last": 87.5335977355957,
+          "min": 42.58548823852538,
+          "max": 87.5335977355957,
+          "epoch_of_min": 10,
+          "epoch_of_max": 50
+        },
+        "trace_right": {
+          "first": 97.2059610839844,
+          "last": 142.02295207519538,
+          "min": 97.2059610839844,
+          "max": 142.02295207519538,
+          "epoch_of_min": 5,
+          "epoch_of_max": 50
+        },
+        "ratio": {
+          "first": 0.46033649506911484,
+          "last": 0.6163341655916114,
+          "min": 0.36451984170600626,
+          "max": 0.6547988473066417,
+          "epoch_of_min": 10,
+          "epoch_of_max": 45
+        }
+      },
+      "unimodal": {
+        "trace_left": {
+          "first": 149.66207250976566,
+          "last": 158.63617360839845,
+          "min": 127.86968659667967,
+          "max": 158.63617360839845,
+          "epoch_of_min": 20,
+          "epoch_of_max": 50
+        },
+        "trace_right": {
+          "first": 174.30133081054692,
+          "last": 233.66417402343754,
+          "min": 174.30133081054692,
+          "max": 233.66417402343754,
+          "epoch_of_min": 5,
+          "epoch_of_max": 50
+        }
+      },
+      "final_context_ratios": {
+        "bimodal_left_over_unimodal_left": 0.5517883830939903,
+        "bimodal_right_over_unimodal_right": 0.6078079905435133
+      },
+      "ratio_crosses_one": false
+    }
+  }
+}

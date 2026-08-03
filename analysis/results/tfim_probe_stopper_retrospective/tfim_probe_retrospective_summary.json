@@ -1,0 +1,165 @@
+{
+  "best_looso_methods": [
+    {
+      "exact_selections": 3,
+      "feature": "slope_log_ratio_minus_e3_0",
+      "max_validation_regret": 0.0,
+      "mean_absolute_e3_error": 0.0,
+      "mean_validation_regret": 0.0,
+      "method": "quadratic_validation_fit",
+      "selections": "60/40/60"
+    },
+    {
+      "exact_selections": 3,
+      "feature": "weighted_slope_log_ratio_minus_e3_0",
+      "max_validation_regret": 0.0,
+      "mean_absolute_e3_error": 0.0,
+      "mean_validation_regret": 0.0,
+      "method": "quadratic_validation_fit",
+      "selections": "60/40/60"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "slope_log_ratio_minus_e3_0",
+      "max_validation_regret": 0.00039999999999995595,
+      "mean_absolute_e3_error": 6.666666666666667,
+      "mean_validation_regret": 0.00013333333333331865,
+      "method": "target_distance",
+      "selections": "60/40/40"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "weighted_slope_log_ratio",
+      "max_validation_regret": 0.00039999999999995595,
+      "mean_absolute_e3_error": 6.666666666666667,
+      "mean_validation_regret": 0.00013333333333331865,
+      "method": "target_distance",
+      "selections": "60/40/40"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "weighted_slope_log_ratio_minus_e3_0",
+      "max_validation_regret": 0.00039999999999995595,
+      "mean_absolute_e3_error": 6.666666666666667,
+      "mean_validation_regret": 0.00013333333333331865,
+      "method": "target_distance",
+      "selections": "60/40/40"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "slope_log_ratio",
+      "max_validation_regret": 0.0028000000000000247,
+      "mean_absolute_e3_error": 13.333333333333334,
+      "mean_validation_regret": 0.0009333333333333416,
+      "method": "target_distance",
+      "selections": "60/40/20"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "ema_log_ratio_alpha_0_5",
+      "max_validation_regret": 0.0040000000000000036,
+      "mean_absolute_e3_error": 13.333333333333334,
+      "mean_validation_regret": 0.0013333333333333346,
+      "method": "quadratic_validation_fit",
+      "selections": "20/40/60"
+    },
+    {
+      "exact_selections": 2,
+      "feature": "endpoint_log_ratio",
+      "max_validation_regret": 0.0040000000000000036,
+      "mean_absolute_e3_error": 13.333333333333334,
+      "mean_validation_regret": 0.0013333333333333346,
+      "method": "quadratic_validation_fit",
+      "selections": "20/40/60"
+    }
+  ],
+  "limitations": [
+    "Only three seeds and five intervention candidates per seed.",
+    "Probe points are e4=5/10/15, not the proposed e4=6/9/12/15.",
+    "P4=40 screening is not the final P4=200 outcome.",
+    "No test metrics are used."
+  ],
+  "oracle": {
+    "184": {
+      "best_p4_epoch": 30,
+      "e3": 40,
+      "ema_log_ratio_alpha_0_5": 1.2733798328655723,
+      "ema_log_ratio_alpha_0_5_minus_e3_0": 2.576798292252799,
+      "endpoint_log_ratio": 1.371575954563448,
+      "endpoint_log_ratio_minus_e3_0": 2.837379191897371,
+      "forecast_log_ratio_e18": 1.4713741823144642,
+      "forecast_log_ratio_e18_minus_e3_0": 3.0755158786190533,
+      "mean_log_ratio": 1.2406477922996137,
+      "mean_log_ratio_minus_e3_0": 2.489937992371275,
+      "ratio_e10": 3.7721171771714417,
+      "ratio_e15": 3.941557518909007,
+      "ratio_e5": 2.7807786907000778,
+      "seed": 184,
+      "slope_log_ratio": 0.03488449615144897,
+      "slope_log_ratio_minus_e3_0": 0.0816396631863956,
+      "slurm_job_id": "20361993",
+      "validation_dominant_accuracy": 0.7632,
+      "validation_full_accuracy": 0.88,
+      "validation_weak_accuracy": 0.4358,
+      "wandb_run_id": "sofvr9wb",
+      "weighted_slope_log_ratio": 0.02765332409555143,
+      "weighted_slope_log_ratio_minus_e3_0": 0.07153845508452156
+    },
+    "285": {
+      "best_p4_epoch": 25,
+      "e3": 60,
+      "ema_log_ratio_alpha_0_5": 2.0394834621504847,
+      "ema_log_ratio_alpha_0_5_minus_e3_0": 3.9744999132136813,
+      "endpoint_log_ratio": 2.2200918068637754,
+      "endpoint_log_ratio_minus_e3_0": 4.476544106653236,
+      "forecast_log_ratio_e18": 2.3914364791395464,
+      "forecast_log_ratio_e18_minus_e3_0": 4.912303430621495,
+      "mean_log_ratio": 1.9792806805793877,
+      "mean_log_ratio_minus_e3_0": 3.807151848733829,
+      "ratio_e10": 8.079023330363626,
+      "ratio_e15": 9.208176200855972,
+      "ratio_e5": 5.09611887237676,
+      "seed": 285,
+      "slope_log_ratio": 0.05916125622614295,
+      "slope_log_ratio_minus_e3_0": 0.14785308271975212,
+      "slurm_job_id": "20362002",
+      "validation_dominant_accuracy": 0.8268,
+      "validation_full_accuracy": 0.8822,
+      "validation_weak_accuracy": 0.356,
+      "wandb_run_id": "f755gq6a",
+      "weighted_slope_log_ratio": 0.05001800624063584,
+      "weighted_slope_log_ratio_minus_e3_0": 0.13623628245002328
+    },
+    "83": {
+      "best_p4_epoch": 35,
+      "e3": 60,
+      "ema_log_ratio_alpha_0_5": 1.71039306471908,
+      "ema_log_ratio_alpha_0_5_minus_e3_0": 3.0114533810678914,
+      "endpoint_log_ratio": 1.8021729131202378,
+      "endpoint_log_ratio_minus_e3_0": 3.305907322260116,
+      "forecast_log_ratio_e18": 1.887163802107377,
+      "forecast_log_ratio_e18_minus_e3_0": 3.57736591500342,
+      "mean_log_ratio": 1.679799781918694,
+      "mean_log_ratio_minus_e3_0": 2.913302067337151,
+      "ratio_e10": 5.624711306955555,
+      "ratio_e15": 6.06280711497203,
+      "ratio_e5": 4.526987960986998,
+      "seed": 83,
+      "slope_log_ratio": 0.029211610404989503,
+      "slope_log_ratio_minus_e3_0": 0.09322114426313911,
+      "slurm_job_id": "20361987",
+      "validation_dominant_accuracy": 0.8178,
+      "validation_full_accuracy": 0.8914,
+      "validation_weak_accuracy": 0.4758,
+      "wandb_run_id": "xfzj3s66",
+      "weighted_slope_log_ratio": 0.025273860750852722,
+      "weighted_slope_log_ratio_minus_e3_0": 0.08100128343798167
+    }
+  },
+  "outcome": "best P4<=40 validation_proper full accuracy",
+  "probe_epochs": [
+    5,
+    10,
+    15
+  ]
+}

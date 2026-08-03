@@ -1,0 +1,31 @@
+{
+  "all_slope_signs_agree": true,
+  "best_recovery_by_seed": {
+    "184": 47,
+    "285": 70,
+    "83": 80
+  },
+  "full_epochs": [
+    5,
+    8,
+    11,
+    14,
+    17
+  ],
+  "outcome": "hierarchical distance to per-seed clean P2=200 validation_proper accuracy gold",
+  "prefix_epochs": [
+    5,
+    8,
+    11,
+    14
+  ],
+  "refinement_goal": "one exact Phase-3 epoch per seed",
+  "selection_order": [
+    "absolute full accuracy gap",
+    "mean absolute dominant/weak accuracy gap",
+    "absolute dominant accuracy gap",
+    "absolute weak accuracy gap",
+    "earlier e3"
+  ],
+  "test_metrics_used": false
+}
