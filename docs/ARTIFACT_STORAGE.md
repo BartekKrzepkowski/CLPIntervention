@@ -31,3 +31,11 @@ Helper odrzuca `REPORTS_DIR` poza `/net/storage` i zapisuje logi w
 `$REPORTS_DIR/slurm_logs`. Starych artefaktów w worktree nie wolno
 automatycznie usuwać ani przenosić: migracja musi mieć jawny zakres i zachować
 powiązania między logami, checkpointami oraz analizami.
+
+## Zarejestrowane migracje
+
+- Wyniki dwudniowego rozwoju stoppera TFIM z 2026-08-03/04, w tym oracle,
+  odrzucone replaye z kalibracją na oracle oraz końcowy gęsty refinement bez
+  leakage, znajdują się pod
+  `$REPORTS_DIR/analysis/tfim_stopper_development_2026-08-03_04/`.
+  Repozytorium zachowuje jedynie opis metodologii, job ID i końcowe liczby.
