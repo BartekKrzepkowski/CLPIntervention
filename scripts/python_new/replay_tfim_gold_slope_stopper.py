@@ -94,11 +94,19 @@ def replay_seed(rows, gold_slope):
             revealed.append(current)
             break
         if previous is not None and _sign(previous["delta_slope_to_gold"]) != side:
+            selected = min(
+                (previous, current),
+                key=lambda item: (
+                    item["absolute_delta_slope_to_gold"],
+                    item["e3"],
+                ),
+            )
             current["decision"] = "stop_and_refine_first_crossing"
             result.update(
                 status="crossing_bracket_found",
                 bracket_left_e3=previous["e3"],
                 bracket_right_e3=current["e3"],
+                selected_e3=selected["e3"],
             )
             revealed.append(current)
             break
