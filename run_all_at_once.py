@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 import logging
 import os
-import sys
 from collections import defaultdict
-from copy import deepcopy
 
 import numpy as np
 import torch
 from omegaconf import OmegaConf
 
-# from rich.traceback import install
-# install(show_locals=True)
 
-from src.data.transforms import TRANSFORMS_BLURRED_RIGHT_NAME_MAP
-from src.modules.aux_modules import TraceFIM, RepresentationsSpectra, DeadReLU
-from src.modules.aux_modules_collapse import GradientsSpectralStiffness
+from src.modules.aux_modules import DeadReLU
 from src.modules.metrics import RunStatsBiModal
 from src.trainer.trainer_classification_mm_clp import TrainerClassification
 from src.utils.prepare import prepare_criterion, prepare_loaders_clp, prepare_model, prepare_optim_and_scheduler
 from src.utils.utils_criterion import get_samples_weights, load_criterion_specific_params
-from src.utils.utils_data import count_classes, create_dataloader
-from src.utils.utils_model import load_model_specific_params, change_activation
+from src.utils.utils_data import count_classes
+from src.utils.utils_model import load_model_specific_params
 from src.utils.utils_trainer import manual_seed
 
 
@@ -83,7 +77,6 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     }
     
     model = prepare_model(type_names['model'], model_params=model_params).to(device)
-    # change_activation(model, torch.nn.ReLU, torch.nn.GELU)
     logging.info('Model prepared.')
     
     
@@ -105,7 +98,6 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     
 
     batches_per_epoch = len(loaders["train"])
-    T_max = batches_per_epoch * (phase4 + phase3 + phase2 + phase1)
     
     optim_params = {'lr': lr, 'weight_decay': wd}
     scheduler_params = {'lr_lambda': lambda epoch: LR_LAMBDA}
@@ -134,44 +126,12 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     }   
  
  
-    # ════════════════════════ prepare held out data ════════════════════════ #
-    
-    
-    held_out_train = {}
-    held_out_train['proper_x_left'] = torch.load(f'data/train_{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out_train['proper_x_right'] = torch.load(f'data/train_{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out_train['blurred_x_right'] = torch.load(f'data/train_{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
-    held_out_train['y'] = torch.load(f'data/train_{type_names["dataset"]}_held_out_y.pt').to(device)
-    
-    held_out_val = {}
-    held_out_val['proper_x_left'] = torch.load(f'data/val_{type_names["dataset"]}_held_out_proper_x_left.pt').to(device)
-    held_out_val['proper_x_right'] = torch.load(f'data/val_{type_names["dataset"]}_held_out_proper_x_right.pt').to(device)
-    held_out_val['blurred_x_right'] = torch.load(f'data/val_{type_names["dataset"]}_held_out_blurred_x_right.pt').to(device)
-    held_out_val['y'] = torch.load(f'data/val_{type_names["dataset"]}_held_out_y.pt').to(device)
-    
-    loaders_rank = deepcopy(loaders)
-    indices = torch.load(f'data/train_{type_names["dataset"]}_indices.pt').tolist()
-    loaders_rank['train_proper'] = create_dataloader(loaders['train'].dataset, indices, loader_params)
-    loaders_rank['train_blurred'] = create_dataloader(loaders['train'].dataset, indices, loader_params)
-    loaders_rank['train_blurred'].transform2 = TRANSFORMS_BLURRED_RIGHT_NAME_MAP[type_names['dataset']](OVERLAP)
-    del loaders_rank['train']
-    
-    
     # ════════════════════════ prepare extra modules ════════════════════════ #
     
-    MAX_REPR_SIZE = 4000
     extra_modules = defaultdict(lambda: None)
     extra_modules['run_stats'] = RunStatsBiModal(model, optim)
     extra_modules['dead_relu_left'] = DeadReLU(model.left_branch, is_left_branch=True, is_able=False)
     extra_modules['dead_relu_right'] = DeadReLU(model.right_branch, is_left_branch=False, is_able=False)
-    # extra_modules['trace_fim_train'] = TraceFIM(held_out_train, model, num_classes=num_classes, postfix='train', m_sampling=5)
-    # extra_modules['trace_fim_test'] = TraceFIM(held_out_val, model, num_classes=num_classes, postfix='val', m_sampling=5)
-    # extra_modules['stiffness_train'] = GradientsSpectralStiffness(held_out_train, model, cutoff=MAX_REPR_SIZE)
-    # extra_modules['stiffness_test'] = GradientsSpectralStiffness(held_out_val, model, cutoff=MAX_REPR_SIZE)
-    # extra_modules['rank_left_train'] = RepresentationsSpectra(model.left_branch, loaders=loaders_rank, is_left_branch=True, modules_list=[torch.nn.Conv2d, torch.nn.Linear], MAX_REPR_SIZE=MAX_REPR_SIZE)
-    # extra_modules['rank_right_train'] = RepresentationsSpectra(model.right_branch, loaders=loaders_rank, is_left_branch=False, modules_list=[torch.nn.Conv2d, torch.nn.Linear], MAX_REPR_SIZE=MAX_REPR_SIZE)
-    # extra_modules['rank_left_test'] = RepresentationsSpectra(model.left_branch, loaders=loaders_rank, is_left_branch=True, modules_list=[torch.nn.Conv2d, torch.nn.Linear], MAX_REPR_SIZE=MAX_REPR_SIZE)
-    # extra_modules['rank_right_test'] = RepresentationsSpectra(model.right_branch, loaders=loaders_rank, is_left_branch=False, modules_list=[torch.nn.Conv2d, torch.nn.Linear], MAX_REPR_SIZE=MAX_REPR_SIZE)
     
     
     # ════════════════════════ prepare trainer ════════════════════════ #
@@ -209,9 +169,9 @@ def objective(exp_name, model_name, dataset_name, lr, wd, phase1, phase2, phase3
     config.phase3_ends_at_epoch = phase3 + config.phase2_ends_at_epoch
     config.phase4_ends_at_epoch = phase4 + config.phase3_ends_at_epoch
     
-    config.log_multi = batches_per_epoch // (LOGS_PER_EPOCH if LOGS_PER_EPOCH != 0 else batches_per_epoch)
+    config.log_multi = max(1, batches_per_epoch // (LOGS_PER_EPOCH if LOGS_PER_EPOCH != 0 else batches_per_epoch))
     config.run_stats_multi = batches_per_epoch // 2
-    config.fim_trace_multi = batches_per_epoch // 2
+    config.fim_measurements_per_epoch = 2
     config.stiffness_multi = batches_per_epoch * 20
     config.rank_multi = batches_per_epoch * 20
     
