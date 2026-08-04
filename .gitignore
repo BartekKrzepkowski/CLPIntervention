@@ -7,3 +7,12 @@
 __pycache__/
 .ipynb_checkpoints/
 
+**/wandb/
+
+# Local/raw compute artifacts stay on persistent storage. These historical
+# copies are retained locally but must not enter commits.
+analysis/results/**/*_trajectory_seed*.jsonl
+analysis/results/tfim_p4_200_refinement_2026-08-03/
+analysis/results/tfim_p4_200_refinement_round2_2026-08-03/
+analysis/results/tfim_p4_200_refinement_round3_2026-08-03/
+analysis/results/tfim_two_level_stopper_replay_2026-08-03/
