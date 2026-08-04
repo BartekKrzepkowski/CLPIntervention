@@ -1363,6 +1363,19 @@ class ValidationControlledTrainer(TrainerClassification):
         }
         if any(epoch <= 0 or epoch > duration for epoch in milestone_epochs):
             raise ValueError("phase 3 calibration milestone is out of range")
+        materialization_epochs = {
+            int(epoch)
+            for epoch in section.get(
+                "materialization_checkpoint_epochs", []
+            )
+        }
+        if any(
+            epoch <= 0 or epoch > duration
+            for epoch in materialization_epochs
+        ):
+            raise ValueError(
+                "phase 3 materialization checkpoint is out of range"
+            )
         milestone_paths = set(
             (controller_state if resume_state is not None else {}).get(
                 "milestone_checkpoint_paths", []
@@ -1396,6 +1409,18 @@ class ValidationControlledTrainer(TrainerClassification):
         for local_epoch in range(start_epoch + 1, phase3_end + 1):
             self._train_one_epoch(config, local_epoch)
             executed = local_epoch
+            if local_epoch in materialization_epochs:
+                materialized_path = self._save_candidate(
+                    config,
+                    f"phase3_materialized_epoch_{local_epoch}",
+                    phase=3,
+                    phase_epoch=local_epoch,
+                    phase_state=phase3_state(),
+                    extra_metadata={
+                        "checkpoint_role": "materialization_without_evaluation"
+                    },
+                )
+                milestone_paths.add(materialized_path)
             if not should_evaluate_phase_epoch(
                 local_epoch,
                 duration,
