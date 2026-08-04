@@ -1,56 +1,53 @@
 import os
 
-import wandb
-from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 
 
 class TensorboardPyTorch:
     def __init__(self, config):
-        self.whether_use_wandb = config.logger_config['whether_use_wandb']
-        os.makedirs(config.logger_config['log_dir'])
-        # self.dummy_variable = config.logger_config['dummy_variable']
+        self.whether_use_wandb = bool(config.logger_config.get("whether_use_wandb", False))
+        os.makedirs(config.logger_config["log_dir"], exist_ok=True)
+        self.wandb = None
         if self.whether_use_wandb:
-            # wandb.login(key=os.environ['WANDB_API_KEY'])
-            wandb.init(
-                entity=config.logger_config['entity'] if config.logger_config['entity'] is not None else os.environ['WANDB_ENTITY'],
-                project=config.logger_config['project_name'],
-                name=config.exp_name,
-                config=OmegaConf.to_container(config, resolve=True),
-                dir=config.logger_config['log_dir'],
-                mode=config.logger_config['mode'])
-            if len(wandb.patched["tensorboard"]) > 0:
-                wandb.tensorboard.unpatch()
-            wandb.tensorboard.patch(root_logdir=config.logger_config['log_dir'], pytorch=True, save=False)
-            
-        self.writer = SummaryWriter(log_dir=config.logger_config['log_dir'])
-        # if 'layout' in config.logger_config:
-        #     self.writer.add_custom_scalars(config.logger_config['layout'])
+            import wandb
 
+            self.wandb = wandb
+            wandb.init(
+                entity=config.logger_config.get("entity") or os.environ.get("WANDB_ENTITY"),
+                project=config.logger_config["project_name"],
+                name=config.exp_name,
+                config=dict(config),
+                dir=config.logger_config["log_dir"],
+                mode=config.logger_config["mode"],
+            )
+            if wandb.patched["tensorboard"]:
+                wandb.tensorboard.unpatch()
+            wandb.tensorboard.patch(
+                root_logdir=config.logger_config["log_dir"], pytorch=True, save=False
+            )
+        self.writer = SummaryWriter(log_dir=config.logger_config["log_dir"])
 
     def close(self):
-        if self.whether_use_wandb:
-            wandb.finish()
+        if self.wandb is not None:
+            self.wandb.finish()
         self.writer.close()
-        
 
     def flush(self):
         self.writer.flush()
 
-    def log_graph(self, model, criterion):
-        # if self.whether_use_wandb:
-        #     wandb.watch(model, log_freq=5, idx=0, log_graph=True, log='all', criterion=criterion)
-        self.writer.add_graph(model, self.dummy_variable, verbose=False, use_strict_trace=True)
-        
-    def log_figures(self, images, global_step):
-        for tag in images:
-            self.writer.add_figure(tag, images[tag], global_step=global_step)
+    def log_model(self, model, criterion, log=None, log_freq=1000, log_graph=True):
+        # A bimodal graph requires two representative input tensors; the generic
+        # trainer does not own such samples. Scalar and histogram logging remains active.
+        return None
 
-    def log_histogram(self, values, global_step): # problem with numpy=1.24.0
-        for tag in values:
-            self.writer.add_histogram(tag, values[tag], global_step=global_step)
+    def log_plots(self, images, step=None):
+        for tag, image in images.items():
+            self.writer.add_figure(tag, image, global_step=step)
 
-    def log_scalars(self, scalar_dict, global_step):
-        for tag in scalar_dict:
-            self.writer.add_scalar(tag, scalar_dict[tag], global_step=global_step)
+    def log_histogram(self, values, step):
+        for tag, value in values.items():
+            self.writer.add_histogram(tag, value, global_step=step)
 
+    def log_scalars(self, values, step):
+        for tag, value in values.items():
+            self.writer.add_scalar(tag, value, global_step=step)

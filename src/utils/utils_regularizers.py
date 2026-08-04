@@ -1,4 +1,3 @@
-import torch
 
 def get_desired_parameter_names(model, desired_layer_type):
     """

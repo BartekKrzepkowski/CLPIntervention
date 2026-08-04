@@ -5,34 +5,38 @@ import wandb
 
 class WandbLogger:
     def __init__(self, config):
-        self.project = config.logger_config['project_name']
+        self.project = config.logger_config["project_name"]
         self.writer = wandb
-        self.writer.login(key=os.environ['WANDB_API_KEY'])
-        if not os.path.isdir(config.logger_config['log_dir']):
-            os.makedirs(config.logger_config['log_dir'])
+        api_key = os.environ.get("WANDB_API_KEY")
+        mode = config.logger_config["mode"]
+        if api_key and mode != "disabled":
+            self.writer.login(key=api_key)
+        os.makedirs(config.logger_config["log_dir"], exist_ok=True)
         self.writer.init(
-            entity=config.logger_config['entity'],
-            project=config.logger_config['project_name'],
+            entity=config.logger_config["entity"],
+            project=config.logger_config["project_name"],
             name=config.exp_name,
             config=dict(config),
-            # config=OmegaConf.to_container(config, resolve=True),  # czy nie wystarczy dict(config)?
-            dir=config.logger_config['log_dir'],
-            mode=config.logger_config['mode']
+            dir=config.logger_config["log_dir"],
+            mode=mode,
         )
 
     def close(self):
         self.writer.finish()
 
-    def log_model(self, model, criterion, log, log_freq: int=1000, log_graph: bool=True):
+    def log_model(self, model, criterion, log=None, log_freq=1000, log_graph=True):
         self.writer.watch(model, criterion, log=log, log_freq=log_freq, log_graph=log_graph)
-    
-    def log_histograms(self, hists):
-        self.writer.log(hists)
 
-    def log_scalars(self, evaluators, step):
-        self.writer.log(evaluators)
-        
-    def log_plots(self, plot_images):
-        self.writer.log(plot_images)
+    def log_histogram(self, values, step):
+        histograms = {}
+        for name, value in values.items():
+            if hasattr(value, "detach"):
+                value = value.detach().cpu().numpy()
+            histograms[name] = self.writer.Histogram(value)
+        self.writer.log(histograms, step=step)
 
+    def log_scalars(self, values, step):
+        self.writer.log(values, step=step)
 
+    def log_plots(self, images, step=None):
+        self.writer.log(images, step=step)

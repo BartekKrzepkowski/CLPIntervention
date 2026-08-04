@@ -18,8 +18,8 @@ def get_every_but_forbidden_parameter_names(model, forbidden_layer_types):
 
 
 def configure_optimizer(optim_wrapper, model, optim_kwargs):
-    weight_decay = optim_kwargs['weight_decay']
-    del optim_kwargs['weight_decay']
+    optim_kwargs = dict(optim_kwargs)
+    weight_decay = optim_kwargs.pop('weight_decay')
 
     decay_parameters = get_every_but_forbidden_parameter_names(model, FORBIDDEN_LAYER_TYPES)
     decay_parameters = [name for name in decay_parameters if "bias" not in name]
@@ -27,10 +27,12 @@ def configure_optimizer(optim_wrapper, model, optim_kwargs):
         {
             "params": [p for pn, p in model.named_parameters() if pn in decay_parameters and p.requires_grad],
             "weight_decay": weight_decay,
+            "weight_decay_enabled": True,
         },
         {
             "params": [p for pn, p in model.named_parameters() if pn not in decay_parameters and p.requires_grad],
             "weight_decay": 0.0,
+            "weight_decay_enabled": False,
         },
     ]
     optimizer = optim_wrapper(optimizer_grouped_parameters, **optim_kwargs)

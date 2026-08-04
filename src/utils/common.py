@@ -7,10 +7,6 @@ from src.modules.architectures.mm_mlp import MMMLPwithNorm
 from src.modules.architectures.mm_resnets import build_mm_resnet
 from src.modules.architectures.models import MMSimpleCNN
 from src.modules.losses import ClassificationLoss, FisherPenaltyLoss, MSESoftmaxLoss, BalancePenaltyLoss
-from src.visualization.clearml_logger import ClearMLLogger
-from src.visualization.tensorboard_pytorch import TensorboardPyTorch
-from src.visualization.wandb_logger import WandbLogger
-
 
 ACT_NAME_MAP = {
     'gelu': torch.nn.GELU,
@@ -32,11 +28,21 @@ DATASET_NAME_MAP = {
     'mm_tinyimagenet': get_mm_tinyimagenet,
 }
 
-LOGGERS_NAME_MAP = {
-    'clearml': ClearMLLogger,
-    'tensorboard': TensorboardPyTorch,
-    'wandb': WandbLogger
-}
+def create_logger(logger_name, config):
+    """Instantiate a logger without importing every optional backend."""
+    if logger_name == "clearml":
+        from src.visualization.clearml_logger import ClearMLLogger
+
+        return ClearMLLogger(config)
+    if logger_name == "tensorboard":
+        from src.visualization.tensorboard_pytorch import TensorboardPyTorch
+
+        return TensorboardPyTorch(config)
+    if logger_name == "wandb":
+        from src.visualization.wandb_logger import WandbLogger
+
+        return WandbLogger(config)
+    raise ValueError(f"Unknown logger: {logger_name}")
 
 LOSS_NAME_MAP = {
     'balance_loss': BalancePenaltyLoss,
