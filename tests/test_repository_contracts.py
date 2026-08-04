@@ -349,6 +349,7 @@ def test_gold_slope_stopper_replay_stops_at_first_crossing():
     assert replay["status"] == "crossing_bracket_found"
     assert replay["bracket_left_e3"] == 40
     assert replay["bracket_right_e3"] == 60
+    assert replay["selected_e3"] == 60
     assert [row["e3"] for row in replay["revealed"]] == [20, 40, 60]
     assert replay["revealed"][-1]["decision"] == "stop_and_refine_first_crossing"
 
