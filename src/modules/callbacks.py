@@ -1,6 +1,32 @@
 from collections import defaultdict
 
 import torch
+
+
+def source_variances(left_varying, right_varying, dim=0):
+    """Return per-unit source variances for left- and right-varying inputs."""
+    if left_varying.shape != right_varying.shape:
+        raise ValueError("left- and right-varying responses must have equal shapes")
+    if left_varying.size(dim) < 2:
+        raise ValueError("RSV requires at least two augmentations per modality")
+
+    left_variance = left_varying.var(dim=dim, unbiased=False)
+    right_variance = right_varying.var(dim=dim, unbiased=False)
+    return left_variance, right_variance
+
+
+def relative_source_variance(left_varying, right_varying, dim=0):
+    """Return Kleinman RSV: ``+1=left`` and ``-1=right``."""
+    left_variance, right_variance = source_variances(
+        left_varying, right_varying, dim=dim
+    )
+    denominator = left_variance + right_variance
+    return torch.where(
+        denominator > 0,
+        (left_variance - right_variance) / denominator,
+        torch.zeros_like(denominator),
+    )
+
 # czy w papierze chodziło o stale martwe neurony?
 class DeadActivationCallback:
     def __init__(self):
@@ -42,37 +68,42 @@ class DeadActivationCallback:
         
         
 class RSVCallback:
-    def __init__(self):
-        self.dead_acts = defaultdict(int)
-        self.denoms = defaultdict(int)
+    def __init__(self, group_size=200):
+        if group_size <= 2 or group_size % 2:
+            raise ValueError("group_size must be an even integer greater than two")
+        self.group_size = group_size
         self.idx = 0
         self.is_able = False
         self.data = defaultdict(list)
-        
+
     def __call__(self, module, input, output):
-        if (isinstance(module, torch.nn.Linear) or isinstance(module, torch.nn.Conv2d)) and self.is_able: # czy moduł ma w sobie nazwę?
-            for i in range(output.size(0) // self.group_size):
-                interval = self.group_size // 2
-                pack1 = output[i*self.group_size: i*self.group_size + interval]
-                pack2 = output[i*self.group_size + interval: (i+1)*self.group_size]
-                sv_a = pack1.var(dim=0)
-                sv_b = pack2.var(dim=0)
-                rsv = (sv_a - sv_b) / (sv_b + sv_a)
-                rsv = rsv.view(-1)
-                self.data[self.idx].append(rsv)
-            self.idx += 1        
-            
+        if not self.is_able or not isinstance(
+            module, (torch.nn.Linear, torch.nn.Conv2d)
+        ):
+            return
+        if output.size(0) % self.group_size:
+            raise ValueError("RSV batch size must be divisible by group_size")
+
+        interval = self.group_size // 2
+        for start in range(0, output.size(0), self.group_size):
+            left_varying = output[start:start + interval]
+            right_varying = output[start + interval:start + self.group_size]
+            rsv = relative_source_variance(left_varying, right_varying)
+            self.data[self.idx].append(rsv.detach().flatten())
+        self.idx += 1
+
     def reset(self):
         self.data = defaultdict(list)
         self.idx = 0
-    
+
     def gather_data(self):
         return self.data
-    
+
     def disable(self):
         self.is_able = False
-        
+
     def enable(self):
         self.is_able = True
+
 
 CALLBACK_TYPE = {'dead_relu': DeadActivationCallback, 'rsv': RSVCallback}

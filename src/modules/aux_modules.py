@@ -1,370 +1,242 @@
+from abc import abstractmethod
 from collections import defaultdict
-from copy import deepcopy
+import json
+import os
+from pathlib import Path
 
 import torch
-from torch.distributions import Categorical
-from torch.func import functional_call, vmap, grad
+from torch.func import functional_call, grad, vmap
 
 from src.modules.aux_modules_collapse import variance_eucl
-from src.utils import prepare
-from src.utils.utils_optim import get_every_but_forbidden_parameter_names, FORBIDDEN_LAYER_TYPES
+from src.utils.utils_optim import FORBIDDEN_LAYER_TYPES, get_every_but_forbidden_parameter_names
 
-class TraceFIM(torch.nn.Module): #OverheadPrevention
-    def __init__(self, held_out, model, num_classes, postfix, m_sampling=1):
+
+class TraceFIM(torch.nn.Module):
+    # Empirical Fisher probe with common label draws and an isolated RNG.
+
+    def __init__(
+        self, held_out, model, num_classes, postfix, m_sampling=1,
+        sampling_seed=0, chunk_size=16,
+    ):
         super().__init__()
+        if m_sampling < 1:
+            raise ValueError("m_sampling must be positive")
+        if int(chunk_size) < 1:
+            raise ValueError("FIM chunk_size must be positive")
+
         self.device = next(model.parameters()).device
-        self.held_out_proper_x_left = held_out['proper_x_left']
-        self.held_out_proper_x_right = held_out['proper_x_right']
-        self.held_out_blurred_x_right = held_out['blurred_x_right']
-        
+        self.held_out_proper_x_left = held_out["proper_x_left"]
+        self.held_out_proper_x_right = held_out["proper_x_right"]
+        self.held_out_blurred_x_right = held_out["blurred_x_right"]
+        sizes = {
+            self.held_out_proper_x_left.size(0),
+            self.held_out_proper_x_right.size(0),
+            self.held_out_blurred_x_right.size(0),
+        }
+        if len(sizes) != 1 or not sizes or next(iter(sizes)) == 0:
+            raise ValueError("held-out modality tensors must have the same non-zero batch size")
+
         self.model = model
-        self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        self.ft_criterion = vmap(self.grad_and_trace, in_dims=(None, None, None, 0), randomness="different")
-        self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
-        print("\n penalized parameter names TFIM: ", self.penalized_parameter_names, '\n')
-        self.labels = torch.arange(num_classes).to(self.device)
-        self.logger = None
+        self.num_classes = num_classes
         self.postfix = postfix
         self.m_sampling = m_sampling
-        
-    def compute_loss(self, params, buffers, config, sample):
-        batch0 = sample[0].unsqueeze(0)
-        batch1 = sample[1].unsqueeze(0)
-        kwargs = {'left_branch_intervention': config.extra['left_branch_intervention'],
-                  'right_branch_intervention': config.extra['right_branch_intervention'],
-                  'enable_left_branch': config.extra['enable_left_branch'],
-                  'enable_right_branch': config.extra['enable_right_branch']}
-        y_pred = functional_call(self.model, (params, buffers), (batch0, batch1), kwargs=kwargs)
-        # y_sampled = Categorical(logits=y_pred).sample()
-        idx_sampled = torch.nn.functional.softmax(y_pred, dim=1).multinomial(1)
-        loss = self.criterion(y_pred, self.labels[idx_sampled].long().squeeze(-1))
-        return loss
-    
-    def grad_and_trace(self, params, buffers, config, sample):
-        sample_traces = {}
-        sample_grads = grad(self.compute_loss, has_aux=False)(params, buffers, config, sample)
-        for param_name in sample_grads:
-            gr = sample_grads[param_name]
-            if gr is not None:
-                trace_p = (torch.pow(gr, 2)).sum()
-                sample_traces[param_name] = trace_p
-        return sample_traces
+        self.sampling_seed = sampling_seed
+        self.chunk_size = int(chunk_size)
+        self.logger = None
+        self.artifact_path = None
+        self.penalized_parameter_names = set(
+            get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
+        )
+        self.per_sample_trace = vmap(
+            self._grad_and_trace,
+            in_dims=(None, None, None, 0),
+            randomness="different",
+        )
+
+    @staticmethod
+    def _forward_kwargs(config):
+        return {
+            "left_branch_intervention": config.extra["left_branch_intervention"],
+            "right_branch_intervention": config.extra["right_branch_intervention"],
+            "enable_left_branch": config.extra["enable_left_branch"],
+            "enable_right_branch": config.extra["enable_right_branch"],
+        }
+
+    def _compute_loss(self, params, buffers, config, sample):
+        x_left, x_right, sampled_target = sample
+        logits = functional_call(
+            self.model,
+            (params, buffers),
+            (x_left.unsqueeze(0), x_right.unsqueeze(0)),
+            kwargs=self._forward_kwargs(config),
+        )
+        return torch.nn.functional.cross_entropy(logits, sampled_target.unsqueeze(0))
+
+    def _grad_and_trace(self, params, buffers, config, sample):
+        sample_grads = grad(self._compute_loss)(params, buffers, config, sample)
+        return {name: gradient.square().sum() for name, gradient in sample_grads.items()}
+
+    def _sample_targets(self, x_left, x_right, config, global_step):
+        with torch.no_grad():
+            logits = self.model(x_left, x_right, **self._forward_kwargs(config))
+            probabilities = torch.nn.functional.softmax(logits, dim=1)
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(self.sampling_seed + int(global_step))
+        return [
+            torch.multinomial(probabilities, 1, generator=generator).squeeze(1)
+            for _ in range(self.m_sampling)
+        ]
 
     def forward(self, global_step, config, kind):
+        if kind not in {"proper", "blurred"}:
+            raise ValueError(f"Unsupported FIM probe kind: {kind}")
+
+        was_training = self.model.training
         self.model.eval()
-        x_true1 = self.held_out_proper_x_left.to(self.device)
-        x_true2 = self.held_out_proper_x_right.to(self.device) if kind == 'proper' else self.held_out_blurred_x_right.to(self.device)
-        
-        params = {n: p.detach() for n, p in self.model.named_parameters() if n in self.penalized_parameter_names and p.requires_grad}
-        params1 = {n: p for n, p in params.items() if 'left_branch' in n}
-        params2 = {n: p for n, p in params.items() if 'right_branch' in n}
-        params3 = {n: p for n, p in params.items() if 'main_branch' in n}
-        buffers = {}
+        x_left = self.held_out_proper_x_left.to(self.device)
+        x_right_source = (
+            self.held_out_proper_x_right
+            if kind == "proper"
+            else self.held_out_blurred_x_right
+        )
+        x_right = x_right_source.to(self.device)
+        params = {
+            name: parameter.detach()
+            for name, parameter in self.model.named_parameters()
+            if name in self.penalized_parameter_names and parameter.requires_grad
+        }
+        branch_params = {
+            "left": {name: value for name, value in params.items() if "left_branch" in name},
+            "right": {name: value for name, value in params.items() if "right_branch" in name},
+        }
+        if not any(branch_params.values()):
+            raise ValueError("TraceFIM requires a trainable left_branch or right_branch")
+        buffers = {name: buffer.detach() for name, buffer in self.model.named_buffers()}
         evaluators = defaultdict(float)
-        overall_trace = 0.0
-        overall_trace1_bias = 0.0
-        overall_trace1_weight = 0.0
-        overall_trace2_bias = 0.0
-        overall_trace2_weight = 0.0
-        overall_trace3_bias = 0.0
-        overall_trace3_weight = 0.0
-        for _ in range(self.m_sampling):
-            ft_per_sample_grads1 = self.ft_criterion(params1, buffers, config, (x_true1, x_true2))
-            ft_per_sample_grads1 = {k1: v.detach().data for k1, v in ft_per_sample_grads1.items()}
-            ft_per_sample_grads2 = self.ft_criterion(params2, buffers, config, (x_true1, x_true2))
-            ft_per_sample_grads2 = {k1: v.detach().data for k1, v in ft_per_sample_grads2.items()}
-            ft_per_sample_grads3 = {}
-            # ft_per_sample_grads3 = self.ft_criterion(params3, buffers, config, (x_true1, x_true2))
-            # ft_per_sample_grads3 = {k1: v.detach().data for k1, v in ft_per_sample_grads3.items()}
-            ft_per_sample_grads = ft_per_sample_grads1 | ft_per_sample_grads2 | ft_per_sample_grads3
-            params_names1 = [n for n, _ in params1.items()]
-            params_names2 = [n for n, _ in params2.items()]
-            params_names3 = [n for n, _ in params3.items()]
-            for param_name in ft_per_sample_grads:
-                trace_p = ft_per_sample_grads[param_name].mean()          
-                evaluators[f'trace_fim_{self.postfix}_{kind}/{param_name}'] += trace_p.item() / self.m_sampling
-                if param_name in self.penalized_parameter_names:
-                    # overall_trace += trace_p.item()
-                    if param_name in params_names1:
-                        if 'bias' in param_name:
-                            overall_trace1_bias += trace_p.item() / self.m_sampling
-                        elif 'weight' in param_name:
-                            overall_trace1_weight += trace_p.item() / self.m_sampling
-                        else:
-                            raise ValueError("The parameters are neither biases nor weights.")
-                    elif param_name in params_names2:
-                        if 'bias' in param_name:
-                            overall_trace2_bias += trace_p.item() / self.m_sampling
-                        elif 'weight' in param_name:
-                            overall_trace2_weight += trace_p.item() / self.m_sampling
-                        else:
-                            raise ValueError("The parameters are neither biases nor weights.")
-                    elif param_name in params_names3:
-                        if 'bias' in param_name:
-                            overall_trace3_bias += trace_p.item() / self.m_sampling
-                        elif 'weight' in param_name:
-                            overall_trace3_weight += trace_p.item() / self.m_sampling
-                        else:
-                            raise ValueError("The parameters are neither biases nor weights.")
-        
-        # evaluators[f'trace_fim_overall/{kind}_trace_bias'] = overall_trace1_bias + overall_trace2_bias + overall_trace3_bias
-        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace_weight'] = overall_trace1_weight + overall_trace2_weight + overall_trace3_weight
-        # evaluators[f'trace_fim_overall/{kind}_trace'] = evaluators[f'trace_fim_overall/{kind}_trace_bias'] + evaluators[f'trace_fim_overall/{kind}_trace_weight']
-        
-        # evaluators[f'trace_fim_overall/{kind}_trace1_bias'] = overall_trace1_bias
-        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace1_weight'] = overall_trace1_weight
-        # evaluators[f'trace_fim_overall/{kind}_trace1'] = overall_trace1_bias + overall_trace1_weight
-        
-        # evaluators[f'trace_fim_overall/{kind}_trace2_bias'] = overall_trace2_bias
-        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace2_weight'] = overall_trace2_weight
-        # evaluators[f'trace_fim_overall/{kind}_trace2'] = overall_trace2_bias + overall_trace2_weight
-        
-        # evaluators[f'trace_fim_overall/{kind}_trace3_bias'] = overall_trace3_bias
-        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_trace3_weight'] = overall_trace3_weight
-        # evaluators[f'trace_fim_overall/{kind}_trace3'] = overall_trace3_bias + overall_trace3_weight
-        
-        # evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right_bias'] = overall_trace1_bias / (overall_trace2_bias + 1e-10)
-        evaluators[f'trace_fim_overall_{self.postfix}/{kind}_ratio_left_to_right_weight'] = overall_trace1_weight / (overall_trace2_weight + 1e-10)
-        # evaluators[f'trace_fim_overall/{kind}_ratio_left_to_right'] = (overall_trace1_bias + overall_trace1_weight) / (overall_trace2_bias + overall_trace2_weight + 1e-10)
-        # evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
-        # evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
-        evaluators[f'steps/trace_fim_{self.postfix}'] = global_step
-        self.model.train()
-        self.logger.log_scalars(evaluators, global_step)    
-        
-        
-class TraceFIM__(torch.nn.Module):
-    def __init__(self, held_out, model, num_classes):
-        super().__init__()
-        self.device = next(model.parameters()).device
-        self.held_out_proper_x_left = held_out['proper_x_left']
-        self.held_out_proper_x_right = held_out['proper_x_right']
-        self.held_out_blurred_x_right = held_out['blurred_x_right']
-        
-        self.model = model
-        self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        self.ft_criterion = vmap(self.grad_and_trace, in_dims=(None, None, None, 0), randomness="different")
-        self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
-        print("penalized_parameter_names: ", self.penalized_parameter_names)
-        self.labels = torch.arange(num_classes).to(self.device)
-        self.logger = None
-        
-    def compute_loss(self, params, buffers, config, sample):
-        batch0 = sample[0].unsqueeze(0)
-        batch1 = sample[1].unsqueeze(0)
-        kwargs = {'left_branch_intervention': config.extra['left_branch_intervention'],
-                  'right_branch_intervention': config.extra['right_branch_intervention'],
-                  'enable_left_branch': config.extra['enable_left_branch'],
-                  'enable_right_branch': config.extra['enable_right_branch']}
-        y_pred = functional_call(self.model, (params, buffers), (batch0, batch1), kwargs=kwargs)
-        # y_sampled = Categorical(logits=y_pred).sample()
-        prob = torch.nn.functional.softmax(y_pred, dim=1)
-        idx_sampled = prob.multinomial(1)
-        y_sampled = self.labels[idx_sampled].long().squeeze(-1)
-        loss = self.criterion(y_pred, y_sampled)
-        return loss
-    
-    def grad_and_trace(self, params, buffers, config, sample):
-        sample_traces = {}
-        sample_grads = grad(self.compute_loss, has_aux=False)(params, buffers, config, sample)
-        for param_name in sample_grads:
-            gr = sample_grads[param_name]
-            if gr is not None:
-                trace_p = (torch.pow(gr, 2)).sum()
-                sample_traces[param_name] = trace_p
-        return sample_traces
+        branch_traces = {"left": 0.0, "right": 0.0}
+        branch_weight_traces = {"left": 0.0, "right": 0.0}
+        branch_parameter_counts = {
+            branch: sum(parameter.numel() for parameter in selected_params.values())
+            for branch, selected_params in branch_params.items()
+        }
+        branch_weight_parameter_counts = {
+            branch: sum(
+                parameter.numel()
+                for name, parameter in selected_params.items()
+                if name.endswith("weight")
+            )
+            for branch, selected_params in branch_params.items()
+        }
 
-    def forward(self, step, config, kind):
-        self.model.eval()
-        x_true1 = self.held_out_proper_x_left.to(self.device)
-        x_true2 = self.held_out_proper_x_right.to(self.device) if kind == 'proper' else self.held_out_blurred_x_right.to(self.device)
-        
-        params = {k: v.detach() for k, v in self.model.named_parameters() if k in self.penalized_parameter_names and v.requires_grad}
-        buffers = {}
-        ft_per_sample_grads = self.ft_criterion(params, buffers, config, (x_true1, x_true2))
-        ft_per_sample_grads = {k1: v.detach().data for k1, v in ft_per_sample_grads.items()}
-        
-        params_names1 = [n for n, _ in params.items() if 'net1' in n]
-        params_names2 = [n for n, _ in params.items() if 'net2' in n]
-        params_names3 = [n for n, _ in params.items() if 'net3' in n]
-        params_nb1 = sum([p.numel() for n, p in params.items() if 'net1' in n])
-        params_nb2 = sum([p.numel() for n, p in params.items() if 'net2' in n])
-        params_nb3 = sum([p.numel() for n, p in params.items() if 'net3' in n])
-        evaluators = defaultdict(float)
-        overall_trace = 0.0
-        overall_trace1 = 0.0
-        overall_trace2 = 0.0
-        overall_trace3 = 0.0
-        overall_trace1_normalized = 0.0
-        overall_trace2_normalized = 0.0
-        overall_trace3_normalized = 0.0
-        for param_name in ft_per_sample_grads:
-            trace_p = ft_per_sample_grads[param_name].mean()          
-            evaluators[f'trace_fim_{kind}/{param_name}'] += trace_p.item()
-            if param_name in self.penalized_parameter_names:
-                overall_trace += trace_p.item()
-                params_nb = sum([p.numel() for n, p in params.items() if n == param_name])
-                if param_name in params_names1:
-                    overall_trace1 += trace_p.item()
-                    overall_trace1_normalized += trace_p.item() / params_nb
-                elif param_name in params_names2:
-                    overall_trace2 += trace_p.item()
-                    overall_trace2_normalized += trace_p.item() / params_nb
-                elif param_name in params_names3:
-                    overall_trace3 += trace_p.item()
-                    overall_trace3_normalized += trace_p.item() / params_nb
-        
-        evaluators[f'trace_fim_{kind}/overall_trace'] = overall_trace
-        evaluators[f'trace_fim_{kind}/overall_trace1'] = overall_trace1
-        evaluators[f'trace_fim_{kind}/overall_trace2'] = overall_trace2
-        evaluators[f'trace_fim_{kind}/overall_trace3'] = overall_trace3
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_2'] = overall_trace1 / (overall_trace2 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3'] = overall_trace1 / (overall_trace3 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3'] = overall_trace2 / (overall_trace3 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3_normalized_local'] = overall_trace1_normalized / (overall_trace3_normalized + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3_normalized_local'] = overall_trace2_normalized / (overall_trace3_normalized + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_1_to_3_normalized_global'] = (overall_trace1 / params_nb1) / (overall_trace3 / params_nb3 + 1e-10)
-        evaluators[f'trace_fim_{kind}/overall_ratio_2_to_3_normalized_global'] = (overall_trace2 / params_nb2) / (overall_trace3 / params_nb3 + 1e-10)
-        evaluators['steps/trace_fim'] = step
-        self.model.train()
-        self.logger.log_scalars(evaluators, step)    
-        
-        
-class TraceFIM_(torch.nn.Module):
-    def __init__(self, held_out, model, num_classes):
-        super().__init__()
-        self.device = next(model.parameters()).device
-        self.held_out_proper_x_left = held_out['proper_x_left']
-        self.held_out_proper_x_right = held_out['proper_x_right']
-        self.held_out_blurred_x_right = held_out['blurred_x_right']
-        
-        self.model = model
-        self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        self.ft_criterion = vmap(grad(self.compute_loss, has_aux=False), in_dims=(None, None, None, 0), randomness="different")
-        self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
-        print("penalized_parameter_names: ", self.penalized_parameter_names)
-        self.labels = torch.arange(num_classes).to(self.device)
-        self.logger = None
-        
-    def compute_loss(self, params, buffers, config, sample):
-        batch0 = sample[0].unsqueeze(0)
-        batch1 = sample[1].unsqueeze(0)
-        kwargs = {'left_branch_intervention': config.extra['left_branch_intervention'],
-                  'right_branch_intervention': config.extra['right_branch_intervention'],
-                  'enable_left_branch': config.extra['enable_left_branch'],
-                  'enable_right_branch': config.extra['enable_right_branch']}
-        y_pred = functional_call(self.model, (params, buffers), (batch0, batch1), kwargs=kwargs)
-        # y_sampled = Categorical(logits=y_pred).sample()
-        prob = torch.nn.functional.softmax(y_pred, dim=1)
-        idx_sampled = prob.multinomial(1)
-        y_sampled = self.labels[idx_sampled].long().squeeze(-1)
-        loss = self.criterion(y_pred, y_sampled)
-        return loss
+        cuda_devices = []
+        if self.device.type == "cuda":
+            cuda_devices = [self.device.index or torch.cuda.current_device()]
+        try:
+            with torch.random.fork_rng(devices=cuda_devices):
+                sampled_targets = self._sample_targets(
+                    x_left, x_right, config, global_step
+                )
+                sample_count = int(x_left.size(0))
+                denominator = self.m_sampling * sample_count
+                for targets in sampled_targets:
+                    for start in range(0, sample_count, self.chunk_size):
+                        stop = min(start + self.chunk_size, sample_count)
+                        sample = (
+                            x_left[start:stop],
+                            x_right[start:stop],
+                            targets[start:stop],
+                        )
+                        for branch, selected_params in branch_params.items():
+                            if not selected_params:
+                                continue
+                            traces = self.per_sample_trace(
+                                selected_params, buffers, config, sample
+                            )
+                            for parameter_name, per_example_trace in traces.items():
+                                trace = (
+                                    per_example_trace.detach().sum().item()
+                                    / denominator
+                                )
+                                evaluators[
+                                    f"trace_fim_{self.postfix}_{kind}/{parameter_name}"
+                                ] += trace
+                                branch_traces[branch] += trace
+                                if parameter_name.endswith("weight"):
+                                    branch_weight_traces[branch] += trace
+        finally:
+            self.model.train(was_training)
 
-    def forward(self, step, config, kind):
-        self.model.eval()
-        x_true1 = self.held_out_proper_x_left.to(self.device)
-        x_true2 = self.held_out_proper_x_right.to(self.device) if kind == 'proper' else self.held_out_blurred_x_right.to(self.device)
-        
-        params = {k: v.detach() for k, v in self.model.named_parameters() if k in self.penalized_parameter_names and v.requires_grad}
-        buffers = {}
-        ft_per_sample_grads = self.ft_criterion(params, buffers, config, (x_true1, x_true2))
-        ft_per_sample_grads = {k1: v.detach().data for k1, v in ft_per_sample_grads.items()}
-        
-        params_names1 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net1' in n]
-        params_names2 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net2' in n]
-        params_names3 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net3' in n]
-        evaluators = defaultdict(float)
-        overall_trace = 0.0
-        overall_trace1 = 0.0
-        overall_trace2 = 0.0
-        overall_trace3 = 0.0
-        for param_name in ft_per_sample_grads:
-            gr = ft_per_sample_grads[param_name]
-            if gr is not None:
-                trace_p = (gr**2).sum() / gr.size(0)
-                evaluators[f'trace_fim_{kind}/{param_name}'] += trace_p.item()
-                if param_name in self.penalized_parameter_names:
-                    overall_trace += trace_p.item()
-                    if param_name in params_names1:
-                        overall_trace1 += trace_p.item()
-                    elif param_name in params_names2:
-                        overall_trace2 += trace_p.item()
-                    elif param_name in params_names3:
-                        overall_trace3 += trace_p.item()
-        
-        evaluators[f'trace_fim_{kind}/overall_trace'] = overall_trace
-        evaluators[f'trace_fim_{kind}/overall_trace1'] = overall_trace1
-        evaluators[f'trace_fim_{kind}/overall_trace2'] = overall_trace2
-        evaluators[f'trace_fim_{kind}/overall_trace3'] = overall_trace3
-        evaluators['steps/trace_fim'] = step
-        self.model.train()
-        self.logger.log_scalars(evaluators, step)      
-        
-        
-class TraceFIMB(torch.nn.Module):
-    def __init__(self, held_out, model, num_classes):
-        super().__init__()
-        self.device = next(model.parameters()).device
-        self.held_out_proper_x_left = held_out['proper_x_left']
-        self.held_out_proper_x_right = held_out['proper_x_right']
-        self.held_out_blurred_x_right = held_out['blurred_x_right']
-        
-        self.model = model
-        self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        self.labels = torch.arange(num_classes).to(self.device)
-        self.penalized_parameter_names = get_every_but_forbidden_parameter_names(self.model, FORBIDDEN_LAYER_TYPES)
-        print("penalized_parameter_names: ", self.penalized_parameter_names)
-        self.logger = None
-
-    def forward(self, step, config, kind):
-        x_true1 = self.held_out_proper_x_left.to(self.device)
-        x_true2 = self.held_out_proper_x_right.to(self.device) if kind == 'proper' else self.held_out_blurred_x_right.to(self.device)
-        y_pred = self.model(x_true1, x_true2, 
-                            left_branch_intervention=config.extra['left_branch_intervention'],
-                            right_branch_intervention=config.extra['right_branch_intervention'],
-                            enable_left_branch=config.extra['enable_left_branch'],
-                            enable_right_branch=config.extra['enable_right_branch'])
-        y_sampled = Categorical(logits=y_pred).sample()
-        loss = self.criterion(y_pred, y_sampled)
-        params_names, params = zip(*[(n, p) for n, p in self.model.named_parameters() if p.requires_grad])
-        params_names1 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net1' in n]
-        params_names2 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net2' in n]
-        params_names3 = [n for n, p in self.model.named_parameters() if p.requires_grad and 'net3' in n]
-        grads = torch.autograd.grad(
-            loss,
-            params,
-            allow_unused=True)
-        evaluators = defaultdict(float)
-        overall_trace = 0.0
-        overall_trace1 = 0.0
-        overall_trace2 = 0.0
-        overall_trace3 = 0.0
-        for param_name, gr in zip(params_names, grads):
-            if gr is not None:
-                trace_p = (gr**2).sum()
-                evaluators[f'trace_fim_{kind}/{param_name}'] += trace_p.item()
-                if param_name in self.penalized_parameter_names:
-                    overall_trace += trace_p.item()
-                    if param_name in params_names1:
-                        overall_trace1 += trace_p.item()
-                    elif param_name in params_names2:
-                        overall_trace2 += trace_p.item()
-                    elif param_name in params_names3:
-                        overall_trace3 += trace_p.item()
-        
-        evaluators[f'trace_fim_{kind}/overall_trace'] = overall_trace # czy nie trzeba tego przypadkiem mnożyć przez wielkość batcha?
-        evaluators[f'trace_fim_{kind}/overall_trace1'] = overall_trace1
-        evaluators[f'trace_fim_{kind}/overall_trace2'] = overall_trace2
-        evaluators[f'trace_fim_{kind}/overall_trace3'] = overall_trace3
-        evaluators['steps/trace_fim'] = step
-        self.logger.log_scalars(evaluators, step)       
+        left_trace = branch_weight_traces["left"]
+        right_trace = branch_weight_traces["right"]
+        prefix = f"trace_fim_overall_{self.postfix}"
+        left_all_trace = branch_traces["left"]
+        right_all_trace = branch_traces["right"]
+        left_all_count = branch_parameter_counts["left"]
+        right_all_count = branch_parameter_counts["right"]
+        evaluators[f"{prefix}/{kind}_trace"] = left_all_trace + right_all_trace
+        evaluators[f"{prefix}/{kind}_trace1"] = left_all_trace
+        evaluators[f"{prefix}/{kind}_trace2"] = right_all_trace
+        evaluators[f"{prefix}/{kind}_parameter_count1"] = left_all_count
+        evaluators[f"{prefix}/{kind}_parameter_count2"] = right_all_count
+        if left_all_count:
+            evaluators[f"{prefix}/{kind}_trace1_per_parameter"] = (
+                left_all_trace / left_all_count
+            )
+        if right_all_count:
+            evaluators[f"{prefix}/{kind}_trace2_per_parameter"] = (
+                right_all_trace / right_all_count
+            )
+        if left_all_count and right_all_count:
+            evaluators[f"{prefix}/{kind}_ratio_left_to_right"] = (
+                left_all_trace
+                / (right_all_trace + torch.finfo(torch.float32).eps)
+            )
+        evaluators[f"{prefix}/{kind}_trace_per_parameter"] = (
+            (left_all_trace + right_all_trace) / (left_all_count + right_all_count)
+        )
+        evaluators[f"{prefix}/{kind}_trace_weight"] = left_trace + right_trace
+        evaluators[f"{prefix}/{kind}_trace1_weight"] = left_trace
+        evaluators[f"{prefix}/{kind}_trace2_weight"] = right_trace
+        left_count = branch_weight_parameter_counts["left"]
+        right_count = branch_weight_parameter_counts["right"]
+        evaluators[f"{prefix}/{kind}_parameter_count1_weight"] = left_count
+        evaluators[f"{prefix}/{kind}_parameter_count2_weight"] = right_count
+        if left_count:
+            evaluators[f"{prefix}/{kind}_trace1_weight_per_parameter"] = (
+                left_trace / left_count
+            )
+        if right_count:
+            evaluators[f"{prefix}/{kind}_trace2_weight_per_parameter"] = (
+                right_trace / right_count
+            )
+        evaluators[f"{prefix}/{kind}_trace_weight_per_parameter"] = (
+            (left_trace + right_trace) / (left_count + right_count)
+        )
+        if left_count and right_count:
+            evaluators[f"{prefix}/{kind}_ratio_left_to_right_weight"] = left_trace / (
+                right_trace + torch.finfo(torch.float32).eps
+            )
+        evaluators[f"steps/trace_fim_{self.postfix}"] = global_step
+        if self.artifact_path is not None:
+            artifact_path = Path(self.artifact_path)
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "version": 1,
+                "global_step": int(global_step),
+                "phase": int(getattr(config, "phase", 0) or 0),
+                "phase_epoch": int(
+                    getattr(config, "active_phase_epoch", 0) or 0
+                ),
+                "kind": kind,
+                "metrics": dict(evaluators),
+            }
+            with artifact_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+        if self.logger is not None:
+            self.logger.log_scalars(evaluators, global_step)
+        return dict(evaluators)
 
 
-import os
-from abc import abstractmethod
-import matplotlib.pyplot as plt
-import numpy as np
 class BaseAnalysis:
     def export(self, name):
         torch.save(self.result, os.path.join(self.rpath, name + ".pt"))
@@ -438,6 +310,7 @@ class RepresentationsSpectra(BaseAnalysis):
 
     @torch.no_grad()
     def collect_representations(self, kind, phase):
+        was_training = self.model.training
         self.model.eval()
         y_true = torch.empty((0,))
         with torch.no_grad():
@@ -449,7 +322,7 @@ class RepresentationsSpectra(BaseAnalysis):
                 y_true = torch.cat((y_true, y_data))
         for name, rep in self.representations.items():
             self.representations[name] = torch.cat(rep, dim=0).detach()
-        self.model.train()
+        self.model.train(was_training)
         return y_true
     
     def collect_weights(self):
@@ -524,6 +397,8 @@ class RepresentationsSpectra(BaseAnalysis):
         # self.clean_up()
 
     def plot(self, evaluators, prefix, postfix):
+        import matplotlib.pyplot as plt
+
         plot_name = f'{prefix}_plots/{postfix}'
         fig, axs = plt.subplots(1, 1, figsize=(10, 10))
         axs.plot(list(range(len(evaluators))), list(evaluators.values()), "o-")
@@ -548,7 +423,7 @@ class DeadReLU:
         self.model = model
         self.dead_acts = defaultdict(int)
         self.denoms = defaultdict(int)
-        self.modules_list = [torch.nn.ReLU, torch.nn.LeakyReLU, torch.nn.GELU]
+        self.modules_list = [torch.nn.ReLU]
         self.is_able = is_able
         self.nb_of_dead_relu = {}
         self.handels = []
@@ -579,6 +454,8 @@ class DeadReLU:
                 self.handels.append(module.register_forward_hook(self._deadrelu_hook(name)))
                     
     def at_the_epoch_end(self, phase, max_dataset, step):
+        if not self.nb_of_dead_relu:
+            return
         number = sum([(self.nb_of_dead_relu[name] == max_dataset).sum() for name in self.nb_of_dead_relu]) / sum([self.nb_of_dead_relu[name].shape[0] for name in self.nb_of_dead_relu])
         evaluators = {f'nb_of_dead_relu_units_{"left" if self.is_left_branch else "right"}_branch/overall_frac____epoch____{phase}': number}
         numbers = [(self.nb_of_dead_relu[name] == max_dataset).float().mean() for name in self.nb_of_dead_relu]

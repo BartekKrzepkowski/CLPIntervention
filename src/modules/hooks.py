@@ -1,4 +1,3 @@
-import torch
 
 from src.modules.callbacks import CALLBACK_TYPE
 

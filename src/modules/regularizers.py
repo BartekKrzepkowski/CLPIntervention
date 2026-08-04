@@ -4,7 +4,6 @@ import torch
 from torch.distributions import Categorical
 
 from src.utils.utils_optim import get_every_but_forbidden_parameter_names, FORBIDDEN_LAYER_TYPES
-from src.utils.utils_regularizers import get_desired_parameter_names
 
 
 class FisherPenaly(torch.nn.Module):

@@ -88,10 +88,10 @@ class ResNet(nn.Module):
         overlap: float = 0.0,
         img_height: int = 32,
         img_width: int = 32,
+        input_channels: int = 3,
         modify_resnet: bool = False,
     ) -> None:
         super().__init__()
-        from math import ceil
         # _log_api_usage_once(self)
         self.eps = eps
         self.scaling_factor = 2 if wheter_concate else 1
@@ -118,11 +118,11 @@ class ResNet(nn.Module):
         self.base_width = width_per_group
 
         self.inplanes = int(64 * width_scale)
-        self.conv11 = torch.nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=2, bias=False) if modify_resnet else \
-            nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv11 = torch.nn.Conv2d(input_channels, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False) if modify_resnet else \
+            nn.Conv2d(input_channels, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.maxpool1 = torch.nn.Identity() if modify_resnet else nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.conv21 = torch.nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=2, bias=False) if modify_resnet else \
-            nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv21 = torch.nn.Conv2d(input_channels, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False) if modify_resnet else \
+            nn.Conv2d(input_channels, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.maxpool2 = torch.nn.Identity() if modify_resnet else nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.left_branch = nn.Sequential(self.conv11,
@@ -132,6 +132,7 @@ class ResNet(nn.Module):
                                   self._make_layer(block, 64, layers[0]),
                                   self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]))
         self.inplanes = int(64 * width_scale)
+        self.dilation = 1
         self.right_branch = nn.Sequential(self.conv21,
                                   norm_layer(self.inplanes),
                                   nn.ReLU(inplace=True),
@@ -139,14 +140,14 @@ class ResNet(nn.Module):
                                   self._make_layer(block, 64, layers[0]),
                                   self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]))
 
-        z = torch.randn(1, 3, img_height, img_width)
+        z = torch.zeros(1, input_channels, img_height, img_width)
         # z = self.left_branch(z)
         # _, self.channels_out, self.height, self.width = z.shape
         self.channels_out, self.height, self.width, pre_mlp_channels = infer_dims_from_blocks(self.left_branch, z, scaling_factor=self.scaling_factor)
         self.main_branch = nn.Sequential(self._make_layer(block, 256 * self.scaling_factor, layers[2], stride=2, dilate=replace_stride_with_dilation[1]),
                                   self._make_layer(block, 512 * self.scaling_factor, layers[3], stride=2, dilate=replace_stride_with_dilation[2]))
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(int(512 * width_scale * block.expansion), num_classes)
+        self.fc = nn.Linear(int(512 * width_scale * block.expansion * self.scaling_factor), num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -218,7 +219,19 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x1, x2, left_branch_intervention=None, right_branch_intervention=None, enable_left_branch=True, enable_right_branch=True):
+    def classify_encoded_modalities(self, features_left, features_right):
+        """Fuse already encoded modalities and run the shared classifier."""
+        y = (
+            torch.cat((features_left, features_right), dim=1)
+            if self.scaling_factor == 2
+            else features_left + features_right
+        )
+        y = self.main_branch(y)
+        y = self.avgpool(y)
+        y = torch.flatten(y, 1)
+        return self.fc(y)
+
+    def forward(self, x1, x2, left_branch_intervention=None, right_branch_intervention=None, enable_left_branch=True, enable_right_branch=True, return_features=False):
         assert left_branch_intervention is None or right_branch_intervention is None, "At least one branchnet should be left intact"
         assert enable_left_branch or enable_right_branch, "At least one branchnet should be enabled"
 
@@ -231,9 +244,9 @@ class ResNet(nn.Module):
             x1 = self.left_branch(x1)
         else:
             if left_branch_intervention == "occlusion":
-                x1 = torch.randn((x1.size(0), self.channels_out, self.height, self.width), device=x1.device) * self.eps
+                x1 = x1.new_empty((x1.size(0), self.channels_out, self.height, self.width)).normal_() * self.eps
             elif left_branch_intervention == "deactivation":
-                x1 = torch.zeros((x1.size(0), self.channels_out, self.height, self.width), device=x1.device)
+                x1 = x1.new_zeros((x1.size(0), self.channels_out, self.height, self.width))
             else:
                 raise ValueError("Invalid left branch intervention")
     
@@ -246,24 +259,21 @@ class ResNet(nn.Module):
             x2 = self.right_branch(x2)
         else:
             if right_branch_intervention == "occlusion":
-                x2 = torch.randn((x2.size(0), self.channels_out, self.height, self.width), device=x2.device) * self.eps
+                x2 = x2.new_empty((x2.size(0), self.channels_out, self.height, self.width)).normal_() * self.eps
             elif right_branch_intervention == "deactivation":
-                x2 = torch.zeros((x2.size(0), self.channels_out, self.height, self.width), device=x2.device)
+                x2 = x2.new_zeros((x2.size(0), self.channels_out, self.height, self.width))
             else:
                 raise ValueError("Invalid right branch intervention")
 
-        y = torch.cat((x1, x2), dim=-1) if self.scaling_factor == 2 else x1 + x2
-        y = self.main_branch(y)
-        y = self.avgpool(y)
-        y = torch.flatten(y, 1)
-        y = self.fc(y)
-        return y
+        features_left, features_right = x1, x2
+        y = self.classify_encoded_modalities(features_left, features_right)
+        return (y, features_left, features_right) if return_features else y
 
 
 def build_mm_resnet(num_classes, input_channels, img_height, img_width, overlap, backbone_type, batchnorm_layers, modify_resnet, only_features, skips, wheter_concate, width_scale):
 
     resnet = partial(
-        ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate, img_height=img_height, img_width=img_width
+        ResNet, num_classes=num_classes, width_scale=width_scale, skips=skips, overlap=overlap, modify_resnet=modify_resnet, wheter_concate=wheter_concate, img_height=img_height, img_width=img_width, input_channels=input_channels
     )
     if not batchnorm_layers:
         resnet = partial(resnet, norm_layer=nn.Identity)

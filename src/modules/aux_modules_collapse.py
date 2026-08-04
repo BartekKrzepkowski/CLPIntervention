@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 import numpy as np
-from scipy.linalg import eigh
 import torch
 
 
@@ -200,7 +199,6 @@ def variance_eucl(x_data, y_true, evaluators, label, phase, batch_size=200):
         
 import torch
 from torch.func import functional_call, vmap, grad
-from sklearn.cluster import SpectralClustering
 
 from src.utils.utils_optim import get_every_but_forbidden_parameter_names, FORBIDDEN_LAYER_TYPES
     
@@ -236,6 +234,7 @@ class GradientsSpectralStiffness(torch.nn.Module):
         return loss, y_pred
 
     def forward(self, step, config, scope, phase, kind):
+        was_training = self.model.training
         self.model.eval()
         x_true1 = self.held_out_proper_x_left
         x_true2 = self.held_out_proper_x_right if kind == 'proper' else self.held_out_blurred_x_right
@@ -255,18 +254,20 @@ class GradientsSpectralStiffness(torch.nn.Module):
         
         ft_per_sample_grads1, y_pred = None, None
         
-        for i in range(y_true.shape[0] // chunk_size):  # accumulate grads
-            ft_per_sample_grads1_, y_pred_ = self.ft_criterion(params1, buffers, config, (x_true1[i*chunk_size: (i+1)*chunk_size], x_true2[i*chunk_size: (i+1)*chunk_size]), y_true[i*chunk_size: (i+1)*chunk_size])
-            ft_per_sample_grads1_ = {k1: v.detach().data for k1, v in ft_per_sample_grads1_.items()}
+        for start in range(0, y_true.shape[0], chunk_size):  # accumulate grads
+            end = min(start + chunk_size, y_true.shape[0])
+            ft_per_sample_grads1_, y_pred_ = self.ft_criterion(params1, buffers, config, (x_true1[start:end], x_true2[start:end]), y_true[start:end])
+            ft_per_sample_grads1_ = {k1: v.detach() for k1, v in ft_per_sample_grads1_.items()}
             self.prepare_gradients(ft_per_sample_grads1_)
             # self.sample_cordinates(ft_per_sample_grads1_)  # czy na pewno w róznym czasie chce samplować dla różnych partii danych?
             ft_per_sample_grads1, y_pred = self.update(ft_per_sample_grads1, y_pred, ft_per_sample_grads1_, y_pred_)
         
         ft_per_sample_grads2, y_pred = None, None
         
-        for i in range(y_true.shape[0] // chunk_size):  # accumulate grads
-            ft_per_sample_grads2_, y_pred_ = self.ft_criterion(params2, buffers, config, (x_true1[i*chunk_size: (i+1)*chunk_size], x_true2[i*chunk_size: (i+1)*chunk_size]), y_true[i*chunk_size: (i+1)*chunk_size])
-            ft_per_sample_grads2_ = {k1: v.detach().data for k1, v in ft_per_sample_grads1_.items()}
+        for start in range(0, y_true.shape[0], chunk_size):  # accumulate grads
+            end = min(start + chunk_size, y_true.shape[0])
+            ft_per_sample_grads2_, y_pred_ = self.ft_criterion(params2, buffers, config, (x_true1[start:end], x_true2[start:end]), y_true[start:end])
+            ft_per_sample_grads2_ = {k2: v.detach() for k2, v in ft_per_sample_grads2_.items()}
             self.prepare_gradients(ft_per_sample_grads2_)
             # self.sample_cordinates(ft_per_sample_grads2_)  # czy na pewno w róznym czasie chce samplować dla różnych partii danych?
             ft_per_sample_grads2, y_pred = self.update(ft_per_sample_grads2, y_pred, ft_per_sample_grads2_, y_pred_)
@@ -274,7 +275,7 @@ class GradientsSpectralStiffness(torch.nn.Module):
         
         
         for c in classes:
-            idxs_mask = y_pred_label == c
+            idxs_mask = y_true == c
             evaluators[f'misclassification_per_class/{c}{postfix}'] = (y_pred_label[idxs_mask] != y_true[idxs_mask]).float().mean().item()
             
         del ft_per_sample_grads1_
@@ -308,7 +309,7 @@ class GradientsSpectralStiffness(torch.nn.Module):
         evaluators = self.prepare_and_calculate(ft_per_sample_grads2, y_true, evaluators, prefix('normalized', 'batch_first', 'right'), postfix, to_normalize=True, batch_first=True, risky_names=('concatenated_grads'))
         
         
-        self.model.train()
+        self.model.train(was_training)
         evaluators[f'steps/tunnel_grads_{phase}'] = step
         self.logger.log_scalars(evaluators, step)
         
